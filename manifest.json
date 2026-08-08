@@ -1,0 +1,15 @@
+{
+  "name": "Menú Vega",
+  "short_name": "Menú Vega",
+  "description": "Menú diari i seguiment de les indicacions de la nutricionista",
+  "start_url": "mobil.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f4ed",
+  "theme_color": "#4a7c3f",
+  "lang": "ca",
+  "icons": [
+    { "src": "icona.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

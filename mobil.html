@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#4a7c3f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<title>Menú Vega</title>
+<!--
+   APLICATIU DE MÒBIL
+   Aquest fitxer NO carrega nutri.js. No conté cap caloria, cap
+   macronutrient ni cap objectiu numèric: no hi són, ni al codi.
+   L'única valoració que mostra és l'etiqueta "Equilibrat", que es
+   calcula mirant si el plat té els elements que demana la guia.
+-->
+<style>
+:root{
+  --verd:#4a7c3f; --verd-clar:#eaf2e5; --verd-fosc:#2f5226;
+  --sorra:#f7f4ed; --paper:#fff; --text:#2c2c28; --gris:#8a8a80;
+  --linia:#e3dfd3; --r:16px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--sorra);color:var(--text);
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+ font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;
+ padding-bottom:calc(74px + var(--safe-b))}
+button{font:inherit;border:none;background:none;color:inherit;cursor:pointer}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em}
+
+/* ---------- capçalera ---------- */
+header{background:var(--verd);color:#fff;padding:calc(12px + var(--safe-t)) 16px 14px;
+ position:sticky;top:0;z-index:20}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+header h1{font-size:17px}
+header .sub{font-size:12.5px;opacity:.85;margin-top:1px}
+.navd{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.15);
+ border-radius:99px;padding:3px}
+.navd button{width:32px;height:32px;border-radius:99px;font-size:17px;line-height:1;color:#fff}
+.avui-btn{background:rgba(255,255,255,.18);border-radius:99px;padding:5px 13px;
+ font-size:12.5px;font-weight:600;color:#fff}
+
+/* tira de dies */
+.strip{display:flex;gap:6px;margin-top:12px;overflow-x:auto;padding-bottom:2px;
+ scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.sd{flex:none;min-width:46px;text-align:center;padding:7px 4px;border-radius:12px;
+ background:rgba(255,255,255,.13);color:#fff}
+.sd .d{font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
+.sd .n{font-size:16px;font-weight:700;line-height:1.2}
+.sd.on{background:#fff;color:var(--verd-fosc)}
+.sd.on .d{opacity:.7}
+.sd .pt{height:4px;width:4px;border-radius:99px;background:#fff;margin:3px auto 0;opacity:.55}
+.sd.on .pt{background:var(--verd)}
+.sd .pt.hide{opacity:0}
+
+/* ---------- contingut ---------- */
+main{padding:14px}
+.dtitle{font-size:13px;color:var(--gris);margin:2px 0 12px;text-transform:capitalize}
+.meal{background:var(--paper);border:1px solid var(--linia);border-radius:var(--r);
+ margin-bottom:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.meal.ara{border-color:var(--verd);box-shadow:0 0 0 3px var(--verd-clar)}
+.mh{padding:11px 14px 0;display:flex;align-items:center;gap:9px}
+.mh .hora{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+ color:var(--verd);background:var(--verd-clar);padding:3px 9px;border-radius:99px}
+.mh .ara-tag{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+ color:#fff;background:var(--verd);padding:3px 9px;border-radius:99px}
+.mh .nom{font-size:12.5px;color:var(--gris);font-weight:600}
+.mb{padding:8px 14px 14px}
+.plat{font-size:17px;font-weight:700;line-height:1.3}
+.plat.buit{color:#b6b3a8;font-weight:500;font-style:italic;font-size:15px}
+.equil{display:inline-flex;align-items:center;gap:5px;margin-top:7px;
+ background:var(--verd-clar);color:var(--verd-fosc);border-radius:99px;
+ padding:4px 11px;font-size:12px;font-weight:700}
+.ings{margin-top:11px;border-top:1px solid #f1efe7;padding-top:9px}
+.ings div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:14.5px}
+.ings .q{font-weight:700;white-space:nowrap;color:var(--verd-fosc);
+ font-variant-numeric:tabular-nums}
+.ings .sub{font-size:11.5px;color:var(--gris)}
+.postr{margin-top:9px;font-size:13.5px;color:var(--gris)}
+.postr b{color:var(--text)}
+.macc{display:flex;gap:8px;margin-top:12px}
+.macc button{flex:1;padding:11px;border-radius:12px;font-size:13.5px;font-weight:600;
+ border:1px solid var(--linia);background:#fdfdfb;display:flex;align-items:center;
+ justify-content:center;gap:7px}
+.macc button:active{background:var(--verd-clar)}
+.macc .prim{background:var(--verd);color:#fff;border-color:var(--verd)}
+.foto{margin-top:11px;border-radius:12px;overflow:hidden;position:relative;background:#eee}
+.foto img{width:100%;display:block}
+.foto .x{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;
+ width:30px;height:30px;border-radius:99px;font-size:17px;line-height:1}
+.icona{width:17px;height:17px;flex:none;display:inline-block;vertical-align:-3px}
+
+/* ---------- resum del dia ---------- */
+.resum{background:var(--paper);border:1px solid var(--linia);border-radius:var(--r);
+ padding:14px;margin-bottom:12px}
+.resum h3{font-size:14px;margin-bottom:8px}
+.resum .eq{display:inline-flex;align-items:center;gap:6px;background:var(--verd-clar);
+ color:var(--verd-fosc);border-radius:99px;padding:5px 13px;font-size:13px;font-weight:700}
+.habits{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.hb{border:1px solid var(--linia);border-radius:99px;padding:6px 12px;font-size:12.5px;
+ background:#fdfdfb}
+.hb.on{background:var(--verd-clar);border-color:var(--verd);color:var(--verd-fosc);font-weight:600}
+
+/* ---------- barra inferior ---------- */
+nav.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);
+ border-top:1px solid var(--linia);display:flex;z-index:30;
+ padding-bottom:var(--safe-b);backdrop-filter:blur(10px)}
+nav.bar button{flex:1;padding:9px 4px 8px;font-size:10.5px;color:var(--gris);
+ display:flex;flex-direction:column;align-items:center;gap:3px;font-weight:600}
+nav.bar button.on{color:var(--verd)}
+nav.bar svg{width:22px;height:22px}
+
+/* ---------- full lliscant ---------- */
+.sheet-ov{position:fixed;inset:0;background:rgba(30,30,26,.4);z-index:40;display:none}
+.sheet-ov.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;background:var(--paper);
+ border-radius:20px 20px 0 0;z-index:41;transform:translateY(100%);
+ transition:transform .24s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;
+ padding-bottom:var(--safe-b)}
+.sheet.on{transform:translateY(0)}
+.sh{padding:14px 16px 10px;border-bottom:1px solid var(--linia);flex:none}
+.sh .grip{width:38px;height:4px;background:#dcd8cc;border-radius:99px;margin:0 auto 11px}
+.sb{overflow-y:auto;padding:10px 16px 20px;-webkit-overflow-scrolling:touch}
+.opt{border:1px solid var(--linia);border-radius:14px;padding:13px 14px;margin-bottom:8px;
+ background:#fff}
+.opt:active{background:var(--verd-clar)}
+.opt.sel{border-color:var(--verd);background:var(--verd-clar)}
+.opt .t{font-weight:700;font-size:15.5px}
+.opt .s{font-size:12.5px;color:var(--gris);margin-top:3px;line-height:1.4}
+.cerca{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
+ font-size:16px;background:#fdfdfb;margin-bottom:10px}
+
+/* ---------- setmana ---------- */
+.wk{background:var(--paper);border:1px solid var(--linia);border-radius:var(--r);
+ padding:12px 14px;margin-bottom:9px}
+.wk.avui{border-color:var(--verd);box-shadow:0 0 0 3px var(--verd-clar)}
+.wk h3{font-size:14px;text-transform:capitalize}
+.wk .li{display:flex;gap:9px;padding:5px 0;font-size:13.5px;align-items:baseline}
+.wk .li span:first-child{color:var(--gris);font-size:11px;width:56px;flex:none;
+ text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+
+/* ---------- estat / avisos ---------- */
+.avis{background:#fdf3dc;border:1px solid #f0e2bb;color:#7d5f14;border-radius:12px;
+ padding:11px 13px;font-size:13px;margin-bottom:12px}
+.sinc{font-size:11px;opacity:.85;display:flex;align-items:center;gap:5px}
+.sinc .p{width:6px;height:6px;border-radius:99px;background:#9ec78e}
+.sinc .p.off{background:#d8d4c6}
+.sinc .p.err{background:#e0a24a}
+.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
+ font-size:16px;margin-bottom:9px;background:#fdfdfb}
+.btn{background:var(--verd);color:#fff;padding:13px;border-radius:12px;font-weight:700;
+ width:100%;font-size:15px}
+.btn.g{background:#fff;color:var(--verd-fosc);border:1px solid var(--linia)}
+.buit{text-align:center;color:var(--gris);padding:36px 20px;font-size:14.5px}
+.validat{background:var(--verd-clar);border:1px solid #cfe0c5;color:var(--verd-fosc);
+ border-radius:12px;padding:10px 13px;font-size:13px;margin-bottom:12px;font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div>
+      <h1>Menú Vega</h1>
+      <div class="sinc" id="sinc"><span class="p off"></span><span id="sincTxt">Carregant…</span></div>
+    </div>
+    <button class="avui-btn" id="btnAvui">Avui</button>
+  </div>
+  <div class="strip" id="strip"></div>
+</header>
+
+<main id="vista"></main>
+
+<nav class="bar">
+  <button id="tabDia" class="on">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    Avui</button>
+  <button id="tabSetmana">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+    Setmana</button>
+  <button id="tabCompra">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16l-1.4 11.2a2 2 0 0 1-2 1.8H7.4a2 2 0 0 1-2-1.8Z"/><path d="M9 6V4.5A2.5 2.5 0 0 1 11.5 2h1A2.5 2.5 0 0 1 15 4.5V6"/></svg>
+    Compra</button>
+  <button id="tabMes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    Més</button>
+</nav>
+
+<div class="sheet-ov" id="shov"></div>
+<div class="sheet" id="sheet"><div class="sh" id="shHead"></div><div class="sb" id="shBody"></div></div>
+
+<input type="file" accept="image/*" capture="environment" id="camera" style="display:none">
+
+<script src="firebase-config.js"></script>
+<script src="core.js"></script>
+<script src="sync.js"></script>
+<script>
+/* =====================================================================
+   APLICATIU DE MÒBIL
+   Sense calories, sense macronutrients, sense semàfor.
+   Única valoració visible: l'etiqueta "Equilibrat".
+   ===================================================================== */
+
+let diaSel = iso(TODAY);
+let vista  = "dia";
+let camCtx = null;
+
+/* Si algun aliment personalitzat arriba del servidor amb valors
+   nutricionals, els descartem aquí: en aquest aplicatiu no hi pinten res. */
+function netejarNutri(){
+  let net = false;
+  for(const k of Object.keys(S.customIng||{})){
+    if(S.customIng[k] && S.customIng[k].nutri){ delete S.customIng[k].nutri; net = true; }
+  }
+  if(S.target){ S.target = null; net = true; }
+  return net;
+}
+netejarNutri();
+
+/* ---------- icones ---------- */
+const IC = {
+  camera:'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.1-2h8.4l1.1 2h2.2A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z"/><circle cx="12" cy="13" r="3.2"/></svg>',
+  canvi :'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
+  check :'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/></svg>',
+};
+
+/* ---------- ajudants ---------- */
+function apatActual(){
+  const ara = new Date().getHours()*60 + new Date().getMinutes();
+  const talls = [[0,"esmorzar"],[9*60+30,"migmati"],[12*60,"dinar"],
+                 [15*60+30,"berenar"],[19*60,"sopar"]];
+  let r = "esmorzar";
+  for(const [t,id] of talls) if(ara>=t) r=id;
+  return r;
+}
+const esAvui = () => diaSel===iso(TODAY);
+
+/* ---------- tira de dies ---------- */
+function pintarStrip(){
+  const mon = monday(parseDay(diaSel));
+  let h = "";
+  for(let i=0;i<7;i++){
+    const dt = addDays(mon,i), ds = iso(dt);
+    const day = dayData(ds);
+    const teMenu = Object.keys(day.meals).length>0;
+    h += `<button class="sd ${ds===diaSel?"on":""}" data-d="${ds}">
+      <div class="d">${DIES3[i]}</div><div class="n">${dt.getDate()}</div>
+      <div class="pt ${teMenu?"":"hide"}"></div></button>`;
+  }
+  $("#strip").innerHTML = h;
+  $$("#strip .sd").forEach(b=>b.onclick=()=>{ diaSel=b.dataset.d; pintar(); });
+  const on = $("#strip .sd.on"); if(on) on.scrollIntoView({inline:"center",block:"nearest"});
+}
+
+/* =====================================================================
+   VISTA: DIA
+   ===================================================================== */
+function vistaDia(){
+  const day = dayData(diaSel);
+  const dt  = parseDay(diaSel);
+  const ara = esAvui() ? apatActual() : null;
+  const chk = checkDay(day);
+
+  let h = `<div class="dtitle">${esc(fmtLong(dt))}${esAvui()?" · avui":""}</div>`;
+
+  if(esValidat(day))
+    h += `<div class="validat">${IC.check} Dia tancat i desat al registre</div>`;
+
+  if(!Object.keys(day.meals).length){
+    h += `<div class="buit">Encara no hi ha res planificat per aquest dia.<br>
+          Es programa des de l'ordinador.</div>`;
+    return h;
+  }
+
+  if(chk.complet)
+    h += `<div class="resum"><h3>El dia</h3>
+      <span class="eq">${IC.check} Equilibrat</span>
+      ${pintarHabits(day)}</div>`;
+  else
+    h += `<div class="resum"><h3>El dia</h3>${pintarHabits(day)}</div>`;
+
+  for(const m of MEALS){
+    const d = dishById(day.meals[m.id]);
+    const c = d ? checkMeal(d.id, m.id) : null;
+    const teFoto = !!(day.fotos && day.fotos[m.id]);
+    h += `<div class="meal ${ara===m.id?"ara":""}" id="meal-${m.id}">
+      <div class="mh">
+        <span class="hora">${m.h}</span>
+        <span class="nom">${m.n}</span>
+        ${ara===m.id?'<span class="ara-tag">ara</span>':""}
+      </div>
+      <div class="mb">
+        <div class="plat ${d?"":"buit"}">${d?esc(d.n):"Sense triar"}</div>
+        ${c&&c.complet?`<div class="equil">${IC.check} Equilibrat</div>`:""}`;
+    if(d){
+      h += `<div class="ings">`+Object.entries(d.i).map(([k,g])=>{
+        const x = ing(k);
+        return `<div><span>${esc(x?x.n:k)}${x&&x.nota?` <span class="sub">(${esc(x.nota)})</span>`:""}</span>
+          <span class="q">${esc(qtyTxt(k,g))}</span></div>`;
+      }).join("")+`</div>`;
+      if(m.id==="dinar"||m.id==="sopar"){
+        const p = dishById(day.postres[m.id]);
+        if(p) h += `<div class="postr">Postres: <b>${esc(p.n)}</b></div>`;
+      }
+    }
+    h += `<div class="macc">
+        <button onclick="ferFoto('${m.id}')">${IC.camera} ${teFoto?"Refer la foto":"Foto del plat"}</button>
+        ${esValidat(day)?"":`<button onclick="canviarPlat('${m.id}')">${IC.canvi} Canviar</button>`}
+      </div>
+      <div id="foto-${m.id}"></div>
+    </div></div>`;
+  }
+  return h;
+}
+function pintarHabits(day){
+  return `<div class="habits">`+HABITS.map(x=>
+    `<button class="hb ${day.habits.includes(x.id)?"on":""}" onclick="ferHabit('${x.id}')">
+      ${day.habits.includes(x.id)?"✓ ":""}${esc(x.n)}</button>`).join("")+`</div>`;
+}
+function ferHabit(id){
+  const day = dayData(diaSel);
+  if(esValidat(day)) return;
+  const i = day.habits.indexOf(id);
+  if(i<0) day.habits.push(id); else day.habits.splice(i,1);
+  tocarDia(diaSel); pintar();
+}
+
+/* ---------- fotografies ---------- */
+async function mostrarFotos(){
+  const day = dayData(diaSel);
+  for(const m of MEALS){
+    const cont = document.getElementById("foto-"+m.id);
+    if(!cont) continue;
+    if(!day.fotos || !day.fotos[m.id]){ cont.innerHTML=""; continue; }
+    const blob = await Sync.baixarFoto(diaSel, m.id);
+    if(!blob){ cont.innerHTML = `<div class="postr" style="margin-top:9px">Foto desada</div>`; continue; }
+    const url = URL.createObjectURL(blob);
+    cont.innerHTML = `<div class="foto"><img src="${url}" alt="Foto de l'àpat">
+      <button class="x" onclick="treureFoto('${m.id}')">×</button></div>`;
+  }
+}
+function ferFoto(mealId){ camCtx = mealId; $("#camera").click(); }
+$("#camera").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if(!f || !camCtx) return;
+  const meal = camCtx; camCtx = null;
+  try{
+    const blob = await Fotos.comprimir(f);
+    await Fotos.desar(diaSel, meal, blob);
+    const day = dayData(diaSel);
+    day.fotos[meal] = {u:Date.now()};
+    tocarDia(diaSel);
+    pintar();
+    Sync.pujarFoto(diaSel, meal, blob).catch(()=>{});
+  }catch(err){ alert("No s'ha pogut desar la foto: "+err.message); }
+});
+async function treureFoto(mealId){
+  if(!confirm("Vols esborrar aquesta foto?")) return;
+  await Sync.esborrarFoto(diaSel, mealId);
+  const day = dayData(diaSel);
+  delete day.fotos[mealId];
+  tocarDia(diaSel); pintar();
+}
+
+/* ---------- canviar el plat d'un àpat ---------- */
+function canviarPlat(mealId){
+  const m = MEALS.find(x=>x.id===mealId);
+  const day = dayData(diaSel);
+  const cur = day.meals[mealId];
+  obrirFull(`<div class="grip"></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <h2 style="font-size:17px">${m.n}</h2>
+        <span style="font-size:12.5px;color:var(--gris)">${m.h}</span></div>
+      <div style="font-size:12.5px;color:var(--gris);margin-top:2px">
+        Tria una altra opció per avui</div>`,
+    llistaPlats(mealId, cur));
+  setTimeout(()=>{
+    const c = document.getElementById("cercaPlat");
+    if(c) c.oninput = () => {
+      $("#shBody").innerHTML = llistaPlats(mealId, cur, c.value);
+      const c2 = document.getElementById("cercaPlat");
+      if(c2){ c2.value = c.value; c2.oninput = c.oninput; }
+    };
+  },50);
+}
+function llistaPlats(mealId, cur, q){
+  q = (q||"").toLowerCase().trim();
+  let list = DISHES().filter(d=>d.m.includes(mealId));
+  if(q) list = list.filter(d=>d.n.toLowerCase().includes(q) ||
+      Object.keys(d.i).some(k=>ing(k) && ing(k).n.toLowerCase().includes(q)));
+  return `<input class="cerca" id="cercaPlat" placeholder="Cercar…" value="${esc(q)}">`+
+    (list.length ? list.map(d=>{
+      const c = checkMeal(d.id, mealId);
+      return `<div class="opt ${cur===d.id?"sel":""}" onclick="triarPlat('${mealId}','${d.id}')">
+        <div class="t">${esc(d.n)}${c.complet?' <span style="color:var(--verd);font-size:12px">· equilibrat</span>':""}</div>
+        <div class="s">${esc(ingListShort(d.i,5))}</div></div>`;
+    }).join("") : `<div class="buit">Cap opció amb aquest nom.</div>`);
+}
+function triarPlat(mealId, dishId){
+  const day = dayData(diaSel);
+  day.meals[mealId] = dishId;
+  if((mealId==="dinar"||mealId==="sopar") && !day.postres[mealId]){
+    const altre = mealId==="dinar" ? "sopar" : "dinar";
+    day.postres[mealId] = day.postres[altre]==="p_iogurt" ? "p_fruita_poma" : "p_iogurt";
+  }
+  tocarDia(diaSel); tancarFull(); pintar();
+  setTimeout(()=>{
+    const el = document.getElementById("meal-"+mealId);
+    if(el) el.scrollIntoView({behavior:"smooth", block:"center"});
+  },80);
+}
+
+/* =====================================================================
+   VISTA: SETMANA
+   ===================================================================== */
+function vistaSetmana(){
+  const mon = monday(parseDay(diaSel));
+  let h = `<div class="dtitle">Setmana del ${fmtDay(mon)} al ${fmtDay(addDays(mon,6))}</div>`;
+  let buida = true;
+  for(let i=0;i<7;i++){
+    const dt = addDays(mon,i), ds = iso(dt), day = dayData(ds);
+    if(!Object.keys(day.meals).length) continue;
+    buida = false;
+    const chk = checkDay(day);
+    h += `<div class="wk ${ds===iso(TODAY)?"avui":""}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3>${DIES[i]} ${dt.getDate()}</h3>
+        ${chk.complet?`<span class="equil" style="margin:0">${IC.check} Equilibrat</span>`:""}
+      </div>`;
+    for(const m of MEALS){
+      const d = dishById(day.meals[m.id]);
+      h += `<div class="li"><span>${m.n}</span><span>${d?esc(d.n):"—"}</span></div>`;
+    }
+    h += `<button class="btn g" style="margin-top:9px;padding:9px"
+      onclick="diaSel='${ds}';vista='dia';pintar()">Obrir el dia</button></div>`;
+  }
+  if(buida) h += `<div class="buit">Aquesta setmana encara no està programada.</div>`;
+  return h;
+}
+
+/* =====================================================================
+   VISTA: COMPRA
+   ===================================================================== */
+function vistaCompra(){
+  const mon = monday(parseDay(diaSel));
+  const {out, preps} = compraDe(mon, true);
+  const {sec, claus} = agruparCompra(out);
+  let h = `<div class="dtitle">Del que queda de setmana</div>`;
+  if(!claus.length) return h+`<div class="buit">No hi ha res a comprar: la setmana no està programada.</div>`;
+  for(const k of claus){
+    h += `<div class="wk"><h3 style="text-transform:uppercase;font-size:11.5px;
+      letter-spacing:.06em;color:var(--verd-fosc)">${esc(k)}</h3>`;
+    for(const [ik,g] of sec[k]){
+      const tinc = !!S.pantry[ik];
+      h += `<div class="li" style="${tinc?"opacity:.4;text-decoration:line-through":""}"
+        onclick="marcarCompra('${ik}')">
+        <span style="width:22px">${tinc?"✓":"○"}</span>
+        <span style="flex:1;font-size:14.5px;text-transform:none;letter-spacing:0;color:var(--text)">${esc(ing(ik).n)}</span>
+        <span style="font-weight:700;color:var(--verd-fosc)">${esc(qtyTxt(ik,shopRound(g)))}</span></div>`;
+    }
+    h += `</div>`;
+  }
+  if(preps.length){
+    h += `<div class="wk"><h3>Per preparar a casa</h3>`+
+      preps.map(k=>`<div style="padding:7px 0;border-top:1px solid #f1efe7">
+        <b style="font-size:14px">${esc(ing(k).n)}</b>
+        <div style="font-size:12.5px;color:var(--gris);margin-top:3px;line-height:1.45">${esc(ing(k).recepta)}</div></div>`).join("")+
+      `</div>`;
+  }
+  return h;
+}
+function marcarCompra(k){
+  if(S.pantry[k]) delete S.pantry[k]; else S.pantry[k]=1;
+  saveState(true); pintar();
+}
+
+/* =====================================================================
+   VISTA: MÉS
+   ===================================================================== */
+function vistaMes(){
+  const e = Sync.est;
+  let h = `<div class="dtitle">Opcions</div>`;
+  h += `<div class="wk"><h3>Sincronització</h3>`;
+  if(!Sync.configurat()){
+    h += `<div style="font-size:13.5px;color:var(--gris);margin-top:6px">
+      Ara mateix aquest mòbil guarda el menú i les fotos només aquí.
+      Per connectar-lo amb l'ordinador cal configurar la sincronització
+      seguint la guia.</div>`;
+  } else if(e.estat==="sense-sessio"){
+    h += `<div style="font-size:13.5px;color:var(--gris);margin:6px 0 10px">
+      Inicia la sessió per rebre el menú i enviar les fotos.</div>
+      <input class="camp" id="lgEmail" type="email" placeholder="Correu" autocomplete="username">
+      <input class="camp" id="lgPass" type="password" placeholder="Contrasenya" autocomplete="current-password">
+      <button class="btn" onclick="entrar()">Entrar</button>
+      <div id="lgErr" style="color:#c0392b;font-size:13px;margin-top:8px"></div>`;
+  } else if(e.estat==="connectat"){
+    h += `<div style="font-size:13.5px;margin-top:6px">Sessió iniciada com a
+      <b>${esc(e.email)}</b></div>
+      <div style="font-size:12.5px;color:var(--gris);margin:3px 0 10px">
+      ${e.ultimaSync?"Última actualització a les "+e.ultimaSync.toLocaleTimeString("ca-ES",{hour:"2-digit",minute:"2-digit"}):"Sincronitzant…"}</div>
+      <button class="btn g" onclick="Sync.logout()">Tancar la sessió</button>`;
+  } else {
+    h += `<div style="font-size:13.5px;color:var(--gris);margin-top:6px">${esc(e.missatge)}</div>`;
+  }
+  h += `</div>`;
+
+  h += `<div class="wk"><h3>Receptes base</h3>`+
+    Object.entries(allIng()).filter(([k,v])=>v.prep).map(([k,v])=>
+      `<div style="padding:9px 0;border-top:1px solid #f1efe7">
+        <b style="font-size:14.5px">${esc(v.n)}</b>
+        <div style="font-size:12.5px;color:var(--gris);margin-top:4px;line-height:1.5">${esc(v.recepta)}</div>
+      </div>`).join("")+`</div>`;
+
+  h += `<div class="wk"><h3>L'estructura del dia</h3>
+    <div class="li"><span>7.30h</span><span>Esmorzar</span></div>
+    <div class="li"><span>11h</span><span>Batut de mig matí</span></div>
+    <div class="li"><span>13.30h</span><span>Dinar</span></div>
+    <div class="li"><span>17h</span><span>Berenar</span></div>
+    <div class="li"><span>21h</span><span>Sopar</span></div>
+    <div style="font-size:12.5px;color:var(--gris);margin-top:9px;line-height:1.5">
+      Descansa entre 30 i 40 minuts després del dinar i del sopar.
+      El passeig es pot repartir en 30 minuts al matí i 30 al vespre.
+      El batut es deixa preparat la nit anterior.</div></div>`;
+
+  h += `<div class="wk"><h3>Fotos guardades</h3>
+    <div id="comptaFotos" style="font-size:13.5px;color:var(--gris);margin-top:5px">Comptant…</div></div>`;
+  return h;
+}
+async function comptarFotos(){
+  const el = document.getElementById("comptaFotos");
+  if(!el) return;
+  const k = await Fotos.claus();
+  el.textContent = k.length===0 ? "Encara no hi ha cap foto."
+    : k.length===1 ? "1 foto guardada en aquest mòbil."
+    : k.length+" fotos guardades en aquest mòbil.";
+}
+async function entrar(){
+  const err = document.getElementById("lgErr");
+  err.textContent = "";
+  try{
+    await Sync.login(document.getElementById("lgEmail").value.trim(),
+                     document.getElementById("lgPass").value);
+  }catch(e){
+    err.textContent = /password|credential|user-not-found/i.test(e.code||e.message)
+      ? "El correu o la contrasenya no són correctes." : "No s'ha pogut entrar. Comprova la connexió.";
+  }
+}
+
+/* =====================================================================
+   FULL LLISCANT
+   ===================================================================== */
+function obrirFull(head, body){
+  $("#shHead").innerHTML = head; $("#shBody").innerHTML = body;
+  $("#shov").classList.add("on");
+  requestAnimationFrame(()=>$("#sheet").classList.add("on"));
+}
+function tancarFull(){
+  $("#sheet").classList.remove("on");
+  setTimeout(()=>$("#shov").classList.remove("on"), 220);
+}
+$("#shov").onclick = tancarFull;
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+const VISTES = {dia:vistaDia, setmana:vistaSetmana, compra:vistaCompra, mes:vistaMes};
+function pintar(){
+  pintarStrip();
+  $("#vista").innerHTML = (VISTES[vista]||vistaDia)();
+  for(const [id,v] of Object.entries({tabDia:"dia",tabSetmana:"setmana",
+                                      tabCompra:"compra",tabMes:"mes"}))
+    document.getElementById(id).classList.toggle("on", vista===v);
+  if(vista==="dia") mostrarFotos();
+  if(vista==="mes") comptarFotos();
+}
+$("#tabDia").onclick     = ()=>{ vista="dia";     pintar(); scrollTo(0,0); };
+$("#tabSetmana").onclick = ()=>{ vista="setmana"; pintar(); scrollTo(0,0); };
+$("#tabCompra").onclick  = ()=>{ vista="compra";  pintar(); scrollTo(0,0); };
+$("#tabMes").onclick     = ()=>{ vista="mes";     pintar(); scrollTo(0,0); };
+$("#btnAvui").onclick    = ()=>{ diaSel=iso(TODAY); vista="dia"; pintar(); scrollTo(0,0); };
+
+/* estat de la sincronització */
+function pintarSinc(e, hiHaCanvis){
+  const p = $("#sinc .p");
+  p.className = "p" + (e.estat==="connectat" ? "" :
+                       e.estat==="error" ? " err" : " off");
+  $("#sincTxt").textContent =
+    e.estat==="connectat" ? "Connectat" :
+    e.estat==="sense-sessio" ? "Sessió no iniciada" :
+    e.estat==="carregant" ? "Connectant…" : e.missatge;
+  if(hiHaCanvis){ netejarNutri(); pintar(); }
+  else if(e.estat!=="connectat" && vista==="mes") pintar();
+}
+
+pintar();
+Sync.init(pintarSinc);
+
+/* En tornar a l'aplicatiu, si ha canviat el dia el posem al dia d'avui */
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState!=="visible") return;
+  const avui = new Date(); avui.setHours(0,0,0,0);
+  if(iso(avui)!==iso(TODAY)) location.reload();
+  else pintar();
+});
+</script>
+</body>
+</html>
