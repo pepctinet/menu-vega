@@ -1,20 +1,21 @@
 /* =====================================================================
    MENÚ VEGA · CONFIGURACIÓ DE LA SINCRONITZACIÓ
    ---------------------------------------------------------------------
-   Mentre aquest fitxer estigui tal com està, els dos aplicatius funcionen
-   perfectament però cadascun guarda les dades al seu propi aparell.
+   Dades de connexió del projecte de Firebase "menu-vega".
 
-   Per connectar l'ordinador i el mòbil, segueix la GUIA-CONFIGURACIO.md
-   i substitueix els valors de sota pels del teu projecte de Firebase.
+   Aquests valors NO són secrets: van dins de qualsevol aplicació web i
+   Google compta que siguin públics. Qui protegeix les dades són les
+   regles de seguretat de Firestore i de Storage, que només deixen entrar
+   els comptes registrats a plans/principal/membres.
    ===================================================================== */
 
 const FIREBASE_CONFIG = {
-  apiKey:            "ENGANXA-AQUI-LA-TEVA-CLAU",
-  authDomain:        "el-teu-projecte.firebaseapp.com",
-  projectId:         "el-teu-projecte",
-  storageBucket:     "el-teu-projecte.appspot.com",
-  messagingSenderId: "000000000000",
-  appId:             "1:000000000000:web:0000000000000000000000"
+  apiKey:            "AIzaSyDOapd1TFdPGwNgSslmDUyBIIm9FDWQyG4",
+  authDomain:        "menu-vega.firebaseapp.com",
+  projectId:         "menu-vega",
+  storageBucket:     "menu-vega.firebasestorage.app",
+  messagingSenderId: "551327111753",
+  appId:             "1:551327111753:web:d98f33e573c1f1e73fbd98"
 };
 
 /* Identificador del pla. Si algun dia vols portar més d'una persona,

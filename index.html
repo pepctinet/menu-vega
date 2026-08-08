@@ -1093,9 +1093,30 @@ function exportarRegistre(){
    FOTOGRAFIES  (només amb accés)
    ===================================================================== */
 function viewFotos(){
+  const e = Sync.espaiFotos();
+  const mb = (e.bytes/1024/1024);
+  const alerta = e.percentatge >= 80;
   let h = `<div class="sec-title"><h2>Fotografies</h2>
-    <span class="muted small">Les que s'han fet des del mòbil</span></div>
-    <div id="galTot"><div class="card pad muted">Carregant…</div></div>`;
+    <span class="muted small">Les que s'han fet des del mòbil</span></div>`;
+  if(e.n){
+    h += `<div class="card pad" style="margin-bottom:14px">
+      <div class="spread">
+        <div><b>${e.n}</b> ${e.n===1?"fotografia":"fotografies"}
+          <div class="xs muted">${mb<1 ? Math.round(e.bytes/1024)+" kB" : mb.toFixed(1)+" MB"}
+          de l'espai gratuït (1 GB)</div></div>
+        <div class="small ${alerta?"":"muted"}" style="${alerta?"color:var(--vermell);font-weight:700":""}">
+          ${e.percentatge<0.1 ? "menys del 0,1" : e.percentatge.toFixed(1)} %</div>
+      </div>
+      <div class="kbar" style="margin-top:8px"><span style="width:${Math.max(0.6,Math.min(100,e.percentatge))}%;
+        background:${alerta?"var(--vermell)":"var(--verd)"}"></span></div>
+      ${alerta ? `<div class="small" style="color:var(--vermell);margin-top:8px">
+        L'espai gratuït s'està acabant. Val la pena esborrar les fotografies més antigues
+        des del detall de cada dia.</div>`
+      : `<div class="xs muted" style="margin-top:8px">A aquest ritme hi caben uns
+         ${Math.max(1,Math.round((e.limit-e.bytes)/(e.bytes/e.n)/5/365))} anys més de fotografies.</div>`}
+    </div>`;
+  }
+  h += `<div id="galTot"><div class="card pad muted">Carregant…</div></div>`;
   setTimeout(pintarGaleriaTot, 20);
   return h;
 }

@@ -73,8 +73,14 @@ const Fotos = (() => {
 
   /* Redueix la foto abans de guardar-la: 1200 px de costat màxim i JPEG
      de qualitat 0,72. Una foto de plat queda en 100-200 kB en comptes
-     dels 3-5 MB que fa la càmera. */
-  function comprimir(file, maxCostat=1200, q=0.72){
+     dels 3-5 MB que fa la càmera.
+
+     Com que les fotos viatgen dins d'un document de la base de dades, que
+     té un límit d'1 MB, si la primera passada surt massa gran es torna a
+     comprimir amb menys qualitat fins que hi càpiga de sobres. */
+  const MAX_BYTES = 680 * 1024;   // marge sobre el límit real un cop codificada
+
+  function redimensionar(file, maxCostat, q){
     return new Promise((res,rej)=>{
       const img = new Image();
       const url = URL.createObjectURL(file);
@@ -93,7 +99,34 @@ const Fotos = (() => {
       img.src = url;
     });
   }
-  return {desar, llegir, esborrar, claus, comprimir};
+  async function comprimir(file){
+    const passades = [[1200,0.72],[1100,0.62],[900,0.55],[750,0.5]];
+    let blob = null;
+    for(const [costat,q] of passades){
+      blob = await redimensionar(file, costat, q);
+      if(blob.size <= MAX_BYTES) return blob;
+    }
+    return blob;   // l'última, encara que sigui grandeta
+  }
+
+  /* Conversió entre fitxer binari i text, per poder desar la foto
+     dins d'un document de la base de dades. */
+  function aBase64(blob){
+    return new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload  = () => res(String(r.result).split(",")[1]);
+      r.onerror = () => rej(new Error("No s'ha pogut llegir la imatge"));
+      r.readAsDataURL(blob);
+    });
+  }
+  function deBase64(b64){
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], {type:"image/jpeg"});
+  }
+
+  return {desar, llegir, esborrar, claus, comprimir, aBase64, deBase64, MAX_BYTES};
 })();
 
 
@@ -101,7 +134,7 @@ const Fotos = (() => {
    SINCRONITZACIÓ
    --------------------------------------------------------------------- */
 const Sync = (() => {
-  let app=null, auth=null, dbf=null, storage=null;
+  let app=null, auth=null, dbf=null;
   let unsub = [];
   let onCanvi = () => {};
   let pendents = new Set();
@@ -143,10 +176,9 @@ const Sync = (() => {
         await carregarScript(base+"firebase-app-compat.js");
         await carregarScript(base+"firebase-auth-compat.js");
         await carregarScript(base+"firebase-firestore-compat.js");
-        await carregarScript(base+"firebase-storage-compat.js");
       }
       app = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
-      auth = firebase.auth(); dbf = firebase.firestore(); storage = firebase.storage();
+      auth = firebase.auth(); dbf = firebase.firestore();
       try{ await dbf.enablePersistence({synchronizeTabs:true}); }catch(e){}
       await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
@@ -271,35 +303,57 @@ const Sync = (() => {
   }
   async function logout(){ if(auth) await auth.signOut(); }
 
-  /* --- fotografies --- */
+  /* --- fotografies ---
+     Es guarden com a text dins d'un document de la base de dades, un per
+     foto, a plans/{PLA_ID}/fotos/{data}_{apat}. Firebase només ofereix el
+     seu magatzem d'arxius als plans de pagament, i així ens quedem dins
+     del gratuït. Cada document té un límit d'1 MB, que la compressió
+     respecta de sobres. */
+  const refFoto = (ds, meal) => dbf.doc("plans/"+PLA_ID+"/fotos/"+ds+"_"+meal);
+
   async function pujarFoto(ds, meal, blob){
-    if(est.estat!=="connectat" || !storage) return null;
-    const ref = storage.ref("plans/"+PLA_ID+"/fotos/"+ds+"_"+meal+".jpg");
-    await ref.put(blob, {contentType:"image/jpeg"});
-    return await ref.getDownloadURL();
+    if(est.estat!=="connectat") return null;
+    const b64 = await Fotos.aBase64(blob);
+    await refFoto(ds, meal).set({
+      imatge: b64, dia: ds, apat: meal, mida: blob.size,
+      actualitzat: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
   }
   async function baixarFoto(ds, meal){
     const local = await Fotos.llegir(ds, meal);
-    if(local) return local;
-    if(est.estat!=="connectat" || !storage) return null;
+    if(local) return local;                 // ja la tenim en aquest aparell
+    if(est.estat!=="connectat") return null;
     try{
-      const url = await storage.ref("plans/"+PLA_ID+"/fotos/"+ds+"_"+meal+".jpg").getDownloadURL();
-      const r = await fetch(url);
-      if(!r.ok) return null;
-      const b = await r.blob();
-      await Fotos.desar(ds, meal, b);   // en guardem còpia local
-      return b;
-    }catch(e){ return null; }
+      const d = await refFoto(ds, meal).get();
+      if(!d.exists || !d.data().imatge) return null;
+      const blob = Fotos.deBase64(d.data().imatge);
+      await Fotos.desar(ds, meal, blob);    // en guardem còpia local
+      return blob;
+    }catch(e){ console.warn("baixarFoto:", e); return null; }
   }
   async function esborrarFoto(ds, meal){
     await Fotos.esborrar(ds, meal);
-    if(est.estat==="connectat" && storage){
-      try{ await storage.ref("plans/"+PLA_ID+"/fotos/"+ds+"_"+meal+".jpg").delete(); }catch(e){}
+    if(est.estat==="connectat"){
+      try{ await refFoto(ds, meal).delete(); }catch(e){ console.warn("esborrarFoto:", e); }
     }
   }
 
+  /* Espai ocupat. Es calcula amb les mides que cada dia ja porta desades,
+     sense haver de descarregar cap foto. */
+  function espaiFotos(){
+    let n = 0, bytes = 0;
+    for(const setmana of Object.values(S.weeks||{}))
+      for(const dia of Object.values(setmana))
+        for(const f of Object.values(dia.fotos||{})){
+          n++; bytes += (f && f.mida) ? f.mida : 180*1024;   // estimació si no consta
+        }
+    const LIMIT = 1024*1024*1024;            // 1 GB del pla gratuït
+    return {n, bytes, limit:LIMIT, percentatge: bytes/LIMIT*100};
+  }
+
   return {est, init, login, logout, push, pushSetmana, pushConfig, marcar,
-          pujarFoto, baixarFoto, esborrarFoto, configurat};
+          pujarFoto, baixarFoto, esborrarFoto, espaiFotos, configurat};
 })();
 
 

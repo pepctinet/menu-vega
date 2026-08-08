@@ -354,10 +354,10 @@ $("#camera").addEventListener("change", async e => {
     const blob = await Fotos.comprimir(f);
     await Fotos.desar(diaSel, meal, blob);
     const day = dayData(diaSel);
-    day.fotos[meal] = {u:Date.now()};
+    day.fotos[meal] = {u:Date.now(), mida:blob.size};
     tocarDia(diaSel);
     pintar();
-    Sync.pujarFoto(diaSel, meal, blob).catch(()=>{});
+    Sync.pujarFoto(diaSel, meal, blob).catch(e=>console.warn("pujada:", e));
   }catch(err){ alert("No s'ha pogut desar la foto: "+err.message); }
 });
 async function treureFoto(mealId){
