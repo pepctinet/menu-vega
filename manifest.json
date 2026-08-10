@@ -1,7 +1,7 @@
 {
-  "name": "Menú Vega",
-  "short_name": "Menú Vega",
-  "description": "Menú diari i seguiment de les indicacions de la nutricionista",
+  "name": "Guia Nutricional",
+  "short_name": "Guia Nutricional",
+  "description": "Menú diari i indicacions",
   "start_url": "mobil.html",
   "scope": ".",
   "display": "standalone",
@@ -10,6 +10,11 @@
   "theme_color": "#4a7c3f",
   "lang": "ca",
   "icons": [
-    { "src": "icona.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "icona.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }

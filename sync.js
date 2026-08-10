@@ -126,7 +126,33 @@ const Fotos = (() => {
     return new Blob([arr], {type:"image/jpeg"});
   }
 
-  return {desar, llegir, esborrar, claus, comprimir, aBase64, deBase64, MAX_BYTES};
+  /* Magatzem genèric, per guardar també documents adjunts */
+  async function desarBlob(clau, blob){
+    const d = await obrir();
+    return new Promise((res,rej)=>{
+      const tx = d.transaction(STORE,"readwrite");
+      tx.objectStore(STORE).put({blob, u:Date.now()}, clau);
+      tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+    });
+  }
+  async function llegirBlob(clau){
+    const d = await obrir();
+    return new Promise(res=>{
+      const tx = d.transaction(STORE,"readonly");
+      const q = tx.objectStore(STORE).get(clau);
+      q.onsuccess = ()=>res(q.result ? q.result.blob : null);
+      q.onerror   = ()=>res(null);
+    });
+  }
+  function deBase64Tipus(b64, tipus){
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], {type:tipus||"application/octet-stream"});
+  }
+
+  return {desar, llegir, esborrar, claus, comprimir, aBase64, deBase64, MAX_BYTES,
+          desarBlob, llegirBlob, deBase64Tipus};
 })();
 
 
@@ -169,6 +195,14 @@ const Sync = (() => {
       onCanvi(est); return;
     }
     est.estat="carregant"; est.missatge="Connectant…"; onCanvi(est);
+    /* Si el servidor no respon, no ens hi quedem penjats: al cap de vuit
+       segons passem a treballar amb les dades d'aquest aparell. */
+    const rellotge = setTimeout(()=>{
+      if(est.estat==="carregant"){
+        est.estat="error"; est.missatge="Sense connexió amb el servidor";
+        onCanvi(est);
+      }
+    }, 8000);
     try{
       const V = "10.12.2";
       const base = "https://www.gstatic.com/firebasejs/"+V+"/";
@@ -183,6 +217,7 @@ const Sync = (() => {
       await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
       auth.onAuthStateChanged(async u => {
+        clearTimeout(rellotge);
         aturarEscolta();
         if(!u){
           est.estat="sense-sessio"; est.email=null; est.rol=null;
@@ -194,6 +229,7 @@ const Sync = (() => {
         escoltar();
       });
     }catch(e){
+      clearTimeout(rellotge);
       est.estat="error"; est.missatge="Sense connexió amb el servidor";
       console.warn(e); onCanvi(est);
     }
@@ -217,11 +253,25 @@ const Sync = (() => {
       const r = d.data();
       let canviat = false;
       if(r.rev!=null && r.rev > (S.metaRev||0)){
-        S.custom    = r.custom    || S.custom;
-        S.customIng = r.customIng || S.customIng;
-        S.target    = r.target    !== undefined ? r.target : S.target;
+        S.custom       = r.custom       || S.custom;
+        S.customIng    = r.customIng    || S.customIng;
+        S.editsPlats   = r.editsPlats   || S.editsPlats;
+        S.platsAmagats = r.platsAmagats || S.platsAmagats;
+        S.editsIng     = r.editsIng     || S.editsIng;
+        S.racions      = r.racions      || S.racions;
+        S.canvis       = r.canvis       || S.canvis;
+        S.target    = r.target !== undefined ? r.target : S.target;
         S.metaRev   = r.rev;
         canviat = true;
+      }
+      /* Missatges i pesos es fusionen per element, no es reemplacen:
+         dues persones poden escriure alhora sense trepitjar-se. */
+      if(r.missatges) canviat = fusionarMissatges(r.missatges) || canviat;
+      if(r.pesos)     canviat = fusionarPesos(r.pesos) || canviat;
+      if(r.diari)     canviat = fusionarDiari(r.diari) || canviat;
+      if(r.documents){
+        const ids = new Set((S.documents||[]).map(d=>d.id));
+        for(const d of r.documents) if(!ids.has(d.id)){ (S.documents=S.documents||[]).push(d); canviat = true; }
       }
       if(canviat){ desarLocal(); onCanvi(est, true); }
     }, e=>console.warn("config:",e)));
@@ -246,6 +296,47 @@ const Sync = (() => {
     for(const [ds, dr] of Object.entries(remots)){
       const dl = local[ds];
       if(!dl || (dr.u||0) > (dl.u||0)){ local[ds] = dr; canviat = true; }
+    }
+    return canviat;
+  }
+
+  /* Unió per identificador. Si el mateix missatge arriba pels dos
+     costats, es queden totes les marques de llegit de tots dos. */
+  function fusionarMissatges(remots){
+    const local = S.missatges || (S.missatges = []);
+    const perId = {}; for(const m of local) perId[m.id] = m;
+    let canviat = false;
+    for(const r of remots){
+      const l = perId[r.id];
+      if(!l){ local.push(r); canviat = true; continue; }
+      const abans = JSON.stringify(l.llegits||{});
+      l.llegits = Object.assign({}, r.llegits, l.llegits);
+      if(JSON.stringify(l.llegits)!==abans) canviat = true;
+    }
+    /* els esborrats al servidor desapareixen també aquí */
+    const ids = new Set(remots.map(r=>r.id));
+    const abansN = local.length;
+    S.missatges = local.filter(m => ids.has(m.id) || (Date.now()-new Date(m.quan).getTime()) < 60000);
+    if(S.missatges.length!==abansN) canviat = true;
+    S.missatges.sort((a,b)=>b.quan.localeCompare(a.quan));
+    return canviat;
+  }
+  function fusionarDiari(remots){
+    S.diari = S.diari || {};
+    let canviat = false;
+    for(const [ds,v] of Object.entries(remots)){
+      const l = S.diari[ds];
+      if(!l || (v.u||0) > (l.u||0)){ S.diari[ds] = v; canviat = true; }
+    }
+    return canviat;
+  }
+  /* Cada pesada porta marca de temps: guanya la més recent */
+  function fusionarPesos(remots){
+    S.pesos = S.pesos || {};
+    let canviat = false;
+    for(const [ds, p] of Object.entries(remots)){
+      const l = S.pesos[ds];
+      if(!l || (p.u||0) > (l.u||0)){ S.pesos[ds] = p; canviat = true; }
     }
     return canviat;
   }
@@ -278,6 +369,11 @@ const Sync = (() => {
           S.metaRev = (S.metaRev||0)+1;
           await dbf.doc("plans/"+PLA_ID+"/config/general").set({
             custom:S.custom||[], customIng:S.customIng||{},
+            editsPlats:S.editsPlats||{}, platsAmagats:S.platsAmagats||[],
+            editsIng:S.editsIng||{}, racions:S.racions||{},
+            canvis:(S.canvis||[]).slice(0,300),
+            missatges:(S.missatges||[]).slice(0,300),
+            pesos:S.pesos||{}, diari:S.diari||{}, documents:(S.documents||[]).slice(0,200),
             target:S.target||null, rev:S.metaRev,
             actualitzat: firebase.firestore.FieldValue.serverTimestamp()
           }, {merge:true});
@@ -339,6 +435,55 @@ const Sync = (() => {
     }
   }
 
+  /* --- documents adjunts als missatges ---
+     Un PDF sol passar del megabyte, i un document de la base de dades no
+     hi arriba. Per això es parteix en trossos: una fitxa amb les dades i
+     tants trossos com calgui, que es tornen a ajuntar en descarregar-lo. */
+  const TROS = 600000;                 // caràcters per tros
+  const MAX_DOC = 8 * 1024 * 1024;     // 8 MB de fitxer
+
+  async function pujarDocument(file){
+    if(est.estat!=="connectat") throw new Error("Cal tenir la sessió iniciada per adjuntar fitxers.");
+    if(file.size > MAX_DOC) throw new Error("El fitxer és massa gran (màxim 8 MB).");
+    const b64 = await Fotos.aBase64(file);
+    const id = "d"+Date.now()+Math.random().toString(36).slice(2,6);
+    const trossos = [];
+    for(let i=0;i<b64.length;i+=TROS) trossos.push(b64.slice(i,i+TROS));
+    for(let i=0;i<trossos.length;i++)
+      await dbf.doc("plans/"+PLA_ID+"/documents/"+id+"_c"+i).set({d:trossos[i]});
+    const fitxa = {id, nom:file.name, mida:file.size,
+                   tipus:file.type||"application/octet-stream",
+                   parts:trossos.length, quan:new Date().toISOString(),
+                   qui:(est.email||"aquest aparell")};
+    await dbf.doc("plans/"+PLA_ID+"/documents/"+id).set(fitxa);
+    await Fotos.desarBlob("doc_"+id, file);   // còpia local, per no rebaixar-lo
+    return fitxa;
+  }
+  async function baixarDocument(fitxa){
+    const local = await Fotos.llegirBlob("doc_"+fitxa.id);
+    if(local) return local;
+    if(est.estat!=="connectat") return null;
+    try{
+      let b64 = "";
+      for(let i=0;i<fitxa.parts;i++){
+        const d = await dbf.doc("plans/"+PLA_ID+"/documents/"+fitxa.id+"_c"+i).get();
+        if(!d.exists) return null;
+        b64 += d.data().d;
+      }
+      const blob = Fotos.deBase64Tipus(b64, fitxa.tipus);
+      await Fotos.desarBlob("doc_"+fitxa.id, blob);
+      return blob;
+    }catch(e){ console.warn("baixarDocument:", e); return null; }
+  }
+  async function esborrarDocument(fitxa){
+    if(est.estat!=="connectat") return;
+    try{
+      for(let i=0;i<fitxa.parts;i++)
+        await dbf.doc("plans/"+PLA_ID+"/documents/"+fitxa.id+"_c"+i).delete();
+      await dbf.doc("plans/"+PLA_ID+"/documents/"+fitxa.id).delete();
+    }catch(e){ console.warn("esborrarDocument:", e); }
+  }
+
   /* Espai ocupat. Es calcula amb les mides que cada dia ja porta desades,
      sense haver de descarregar cap foto. */
   function espaiFotos(){
@@ -353,7 +498,8 @@ const Sync = (() => {
   }
 
   return {est, init, login, logout, push, pushSetmana, pushConfig, marcar,
-          pujarFoto, baixarFoto, esborrarFoto, espaiFotos, configurat};
+          pujarFoto, baixarFoto, esborrarFoto, espaiFotos, configurat,
+          pujarDocument, baixarDocument, esborrarDocument};
 })();
 
 

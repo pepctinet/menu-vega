@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#3a5a75">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest-pes.json">
+<link rel="apple-touch-icon" href="icona-pes.svg">
+<title>Registre de pes</title>
+<!--
+   APLICATIU DEL PARE · registre de pes i observacions
+   ------------------------------------------------------------------
+   Pensat per fer servir en el moment de la pesada. Per això la
+   pantalla d'entrada NOMÉS té la casella per escriure: si s'obrís
+   amb l'historial a la vista, ella veuria els números d'altres dies
+   per damunt de l'espatlla. L'historial és darrere d'un toc més.
+
+   No hi ha ni IMC ni pes objectiu, deliberadament: això pertoca a
+   l'equip clínic i no a una eina domèstica.
+-->
+<style>
+:root{
+  --blau:#3a5a75; --blau-clar:#e8eef4; --blau-fosc:#274054;
+  --sorra:#f6f7f9; --paper:#fff; --text:#22282e; --gris:#7d868f;
+  --linia:#dde3e9; --suau:#fbfcfd;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--sorra);color:var(--text);
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+ font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;
+ padding-bottom:calc(24px + var(--safe-b))}
+button{font:inherit;border:none;background:none;color:inherit;cursor:pointer}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em}
+header{background:var(--blau);color:#fff;padding:calc(14px + var(--safe-t)) 16px 16px;
+ position:sticky;top:0;z-index:20}
+.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+header h1{font-size:18px}
+header .data{font-size:13px;opacity:.88;margin-top:2px;text-transform:capitalize}
+.sinc{font-size:11px;display:flex;align-items:center;gap:5px;margin-top:6px;
+ background:rgba(255,255,255,.14);border-radius:99px;padding:3px 10px;color:#fff}
+.sinc .p{width:8px;height:8px;border-radius:99px;background:#5fd35f;flex:none}
+.sinc .p.off{background:#ff6b5e}
+.sinc .p.err{background:#ffc043}
+.hmenu{background:rgba(255,255,255,.16);border-radius:99px;width:38px;height:38px;
+ color:#fff;font-size:17px;flex:none;display:flex;align-items:center;justify-content:center}
+main{padding:18px 16px 0}
+.card{background:var(--paper);border:1px solid var(--linia);border-radius:16px;padding:16px}
+.lb{font-size:12.5px;color:var(--gris);margin-bottom:7px}
+.kg{width:100%;padding:16px;border:1px solid var(--linia);border-radius:14px;
+ font-size:38px;font-weight:800;text-align:center;background:var(--suau);
+ font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kg:focus{outline:2px solid var(--blau-clar);border-color:var(--blau)}
+.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
+ font-size:16px;background:var(--suau);margin-bottom:10px;font-family:inherit}
+textarea.camp{min-height:90px;resize:vertical}
+.btn{background:var(--blau);color:#fff;padding:15px;border-radius:14px;font-weight:700;
+ width:100%;font-size:16px}
+.btn.g{background:#fff;color:var(--blau-fosc);border:1px solid var(--linia)}
+.btn:disabled{opacity:.4}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.ch{border:1px solid var(--linia);border-radius:99px;padding:7px 13px;font-size:13px;
+ background:var(--suau)}
+.ch.on{background:var(--blau-clar);border-color:var(--blau);color:var(--blau-fosc);font-weight:600}
+.ok{background:#e7f4e4;border:1px solid #bcdcb4;color:#2f5226;border-radius:13px;
+ padding:13px 15px;font-size:14.5px;margin-bottom:14px;font-weight:600}
+.ov{position:fixed;inset:0;background:rgba(20,26,32,.45);z-index:40;display:none}
+.ov.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;background:var(--paper);
+ border-radius:20px 20px 0 0;z-index:41;transform:translateY(100%);
+ transition:transform .24s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;
+ padding-bottom:var(--safe-b)}
+.sheet.on{transform:translateY(0)}
+.sh{padding:13px 16px 0;flex:none}
+.grip{width:38px;height:4px;background:#dbe1e7;border-radius:99px;margin:0 auto 12px}
+.sb{overflow-y:auto;padding:12px 16px 22px;flex:1;-webkit-overflow-scrolling:touch}
+.fila{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+ padding:11px 0;border-bottom:1px solid #f0f3f6}
+.fila:last-child{border-bottom:none}
+.fila .d{font-size:13.5px}
+.fila .d small{color:var(--gris);display:block;font-size:11.5px}
+.fila .v{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.avis{font-size:12.5px;color:var(--gris);line-height:1.55;margin-top:12px}
+.buit{text-align:center;color:var(--gris);padding:34px 20px;font-size:14.5px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div>
+      <h1>Registre de pes</h1>
+      <div class="data" id="data">—</div>
+      <div class="sinc" id="sinc"><span class="p off"></span><span id="sincTxt">…</span></div>
+    </div>
+    <button class="hmenu" id="btnHist" aria-label="Historial">☰</button>
+  </div>
+</header>
+
+<main>
+  <div id="avisOk"></div>
+  <div class="card">
+    <div class="lb">Pes d'avui</div>
+    <input class="kg" id="kg" type="number" inputmode="decimal" step="0.1" placeholder="0,0">
+    <div class="avis" style="margin-top:6px">Es pot deixar buit: si només vols anotar com ha anat el dia, escriu l'observació i desa.</div>
+
+    <div class="lb" style="margin-top:16px">Condicions de la pesada</div>
+    <div class="chips" id="chips"></div>
+    <input class="camp" id="hora" placeholder="Altres condicions (opcional)">
+
+    <div class="lb">Observacions del dia</div>
+    <textarea class="camp" id="nota" placeholder="Com ha anat el dia, què has notat…"></textarea>
+
+    <button class="btn" id="desar">Desar</button>
+    <div class="avis">Perquè dues pesades siguin comparables convé fer-les sempre igual:
+      la mateixa hora, després del bany i amb roba equivalent.</div>
+  </div>
+</main>
+
+<div class="ov" id="ov"></div>
+<div class="sheet" id="sheet"><div class="sh" id="shHead"></div><div class="sb" id="shBody"></div></div>
+
+<script src="firebase-config.js"></script>
+<script src="core.js"></script>
+<script src="sync.js"></script>
+<script>
+/* =====================================================================
+   REGISTRE DE PES
+   ===================================================================== */
+const CONDICIONS = ["En dejú","Al matí","Abans d'esmorzar","Després del bany","Al vespre"];
+let cond = [];
+let DS = iso(TODAY);
+
+document.getElementById("data").textContent = fmtLong(TODAY);
+
+function pintarChips(){
+  document.getElementById("chips").innerHTML = CONDICIONS.map(c=>
+    `<button class="ch ${cond.includes(c)?"on":""}" onclick="marcarCond('${c}')">${esc(c)}</button>`).join("");
+}
+function marcarCond(c){
+  const i = cond.indexOf(c);
+  if(i<0) cond.push(c); else cond.splice(i,1);
+  pintarChips();
+}
+pintarChips();
+
+/* Si avui ja hi ha pesada, la carreguem per poder corregir-la */
+function carregarAvui(){
+  const n = notaDia(DS);
+  if(n) document.getElementById("nota").value = n;
+  const p = S.pesos[DS];
+  if(!p){
+    if(n) document.getElementById("avisOk").innerHTML =
+      `<div class="ok">Avui hi ha una observació desada, sense pesada.</div>`;
+    return;
+  }
+  document.getElementById("kg").value = p.kg;
+  document.getElementById("nota").value = p.nota||"";
+  const parts = (p.hora||"").split(" · ");
+  cond = parts.filter(x=>CONDICIONS.includes(x));
+  document.getElementById("hora").value = parts.filter(x=>x && !CONDICIONS.includes(x)).join(" · ");
+  pintarChips();
+  document.getElementById("avisOk").innerHTML =
+    `<div class="ok">Avui ja hi ha una pesada de ${p.kg.toFixed(1)} kg. Si la deses, la corregeixes.</div>`;
+}
+carregarAvui();
+
+document.getElementById("desar").onclick = () => {
+  const kg = document.getElementById("kg").value.trim();
+  const nota = document.getElementById("nota").value.trim();
+  if(!kg && !nota) return alert("Escriu el pes o una observació.");
+  const lliure = document.getElementById("hora").value.trim();
+  const hora = cond.concat(lliure?[lliure]:[]).join(" · ");
+  let avis;
+  if(kg){
+    if(!desarPes(DS, kg, {hora, nota})) return alert("El pes no sembla vàlid.");
+    avis = "Desat: "+S.pesos[DS].kg.toFixed(1)+" kg";
+  } else {
+    /* Dia sense pesada: només queda l'observació */
+    desarNotaDia(DS, nota);
+    avis = "Observació desada, sense pesada";
+  }
+  saveState(true);
+  if(typeof Sync!=="undefined") Sync.pushConfig();
+  document.getElementById("avisOk").innerHTML = `<div class="ok">${esc(avis)}</div>`;
+  window.scrollTo({top:0, behavior:"smooth"});
+};
+
+/* --- historial, darrere d'un toc --- */
+document.getElementById("btnHist").onclick = () => {
+  const serie = seriePes().reverse();
+  const entrades = diariComplet();
+  let h = "";
+  if(!entrades.length) h = `<div class="buit">Encara no hi ha res registrat.</div>`;
+  else {
+    const t = tendenciaPes(serie.slice().reverse(), 7).reverse();
+    const ult = t[0];
+    if(t.length>=4){
+      const fa = t.find(x => (ult.d - x.d) >= 21*86400000) || t[t.length-1];
+      const dif = ult.mitjana - fa.mitjana;
+      h += `<div class="card" style="margin-bottom:12px">
+        <div class="lb">Tendència (mitjana de 7 dies)</div>
+        <div style="font-size:22px;font-weight:800">${ult.mitjana.toFixed(1)} kg</div>
+        <div style="font-size:13px;color:var(--gris);margin-top:3px">
+          ${dif>=0?"+":""}${dif.toFixed(1)} kg respecte de fa ${Math.round((ult.d-fa.d)/86400000)} dies</div>
+        <div class="avis" style="margin-top:8px">La xifra del dia oscil·la més d'un quilo per
+          líquids i digestió. La tendència és el que informa.</div></div>`;
+    }
+    h += diariComplet().map(p=>`<div class="fila">
+      <div class="d">${fmtLong(p.d)}
+        <small>${esc([p.hora, p.notaPes, p.text].filter(Boolean).join(" · ")||"")}</small></div>
+      <div class="v">${p.pes!=null ? p.pes.toFixed(1)+" kg"
+        : '<span style="color:var(--gris);font-weight:400;font-size:13px">nota</span>'}</div>
+      </div>`).join("");
+  }
+  document.getElementById("shHead").innerHTML =
+    `<div class="grip"></div><h2 style="font-size:17px">Historial</h2>
+     <div style="font-size:12.5px;color:var(--gris);margin:3px 0 10px">
+       ${serie.length} pesad${serie.length===1?"a":"es"} · ${entrades.length} entrades</div>`;
+  document.getElementById("shBody").innerHTML = h;
+  document.getElementById("ov").classList.add("on");
+  requestAnimationFrame(()=>document.getElementById("sheet").classList.add("on"));
+};
+function tancarFull(){
+  document.getElementById("sheet").classList.remove("on");
+  setTimeout(()=>document.getElementById("ov").classList.remove("on"), 220);
+}
+document.getElementById("ov").onclick = tancarFull;
+
+/* --- sessió --- */
+function pintarSinc(e, canvis){
+  const p = document.querySelector("#sinc .p");
+  p.className = "p"+(e.estat==="connectat" ? "" : e.estat==="error" ? " err" : " off");
+  document.getElementById("sincTxt").textContent =
+    e.estat==="connectat" ? "sessió iniciada" :
+    e.estat==="sense-sessio" ? "toca per iniciar la sessió" :
+    e.estat==="carregant" ? "connectant…" :
+    e.estat==="error" ? "sense connexió" : "només aquest aparell";
+  if(canvis) carregarAvui();
+}
+document.getElementById("sinc").onclick = () => {
+  if(Sync.est.estat==="connectat"){
+    if(confirm("Tancar la sessió?")) Sync.logout();
+    return;
+  }
+  if(!Sync.configurat()) return alert("Aquest aparell no està connectat al servidor.");
+  document.getElementById("shHead").innerHTML =
+    `<div class="grip"></div><h2 style="font-size:17px">Iniciar la sessió</h2>
+     <div style="font-size:12.5px;color:var(--gris);margin:3px 0 10px">Amb el teu compte</div>`;
+  document.getElementById("shBody").innerHTML =
+    `<input class="camp" id="lgEmail" type="email" placeholder="Usuari" autocomplete="username">
+     <input class="camp" id="lgPass" type="password" placeholder="Contrasenya" autocomplete="current-password">
+     <button class="btn" onclick="entrar()">Entrar</button>
+     <div id="lgErr" style="color:#c0392b;font-size:13px;margin-top:9px"></div>`;
+  document.getElementById("ov").classList.add("on");
+  requestAnimationFrame(()=>document.getElementById("sheet").classList.add("on"));
+};
+async function entrar(){
+  const err = document.getElementById("lgErr"); err.textContent = "";
+  try{
+    await Sync.login(document.getElementById("lgEmail").value.trim(),
+                     document.getElementById("lgPass").value);
+    tancarFull();
+  }catch(e){
+    err.textContent = /password|credential|user-not-found|invalid/i.test(e.code||e.message)
+      ? "L'usuari o la contrasenya no són correctes." : "No s'ha pogut entrar.";
+  }
+}
+
+Sync.init(pintarSinc);
+</script>
+</body>
+</html>

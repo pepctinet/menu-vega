@@ -178,11 +178,11 @@ const BASE_DISHES = [
   i:{pasta:85, tofu:150, espinacs:110, xampinyons:100, aove:20, tahini:15}},
 /* --- combinats segons la guia 2 --- */
  {id:"d_llenties", n:"Llenties amb verdures i amanida", m:["dinar","sopar"], src:"guia 2",
-  i:{llenties:200, pastanaga:100, ceba:60, patata:150, tomaquet:110, aove:20, lli:9}},
+  i:{llenties:200, pastanaga:100, ceba:60, patata:200, tomaquet:110, aove:20, lli:9}},
  {id:"d_moniato_tempeh", n:"Moniato al forn amb tempeh i amanida", m:["dinar","sopar"], src:"guia 2",
-  i:{moniato:250, tempeh:130, canonges:100, tomaquet:110, aove:20, sesam:9}},
+  i:{moniato:350, tempeh:130, canonges:100, tomaquet:110, aove:20, sesam:9}},
  {id:"d_mongetes", n:"Mongetes amb espinacs i pa", m:["dinar","sopar"], src:"guia 2",
-  i:{mongetes:200, espinacs:140, ceba:60, tomaquet:80, pa:60, aove:20, all:8, lli:9}},
+  i:{mongetes:200, espinacs:140, ceba:60, tomaquet:80, pa:95, aove:20, all:8, lli:9}},
  {id:"d_bol_quinoa_hummus", n:"Bol de quinoa, verdures crues i hummus", m:["dinar","sopar"], src:"guia 2",
   i:{quinoa:60, hummus:90, edamame:60, tomaquet:110, cogombre:90, pastanaga:60, aove:15, sesam:9}},
  {id:"d_pasta_bolonyesa", n:"Pasta amb bolonyesa de soja texturitzada", m:["dinar","sopar"], src:"guia 1",
@@ -190,7 +190,7 @@ const BASE_DISHES = [
  {id:"d_curry_cigrons", n:"Curri de cigrons amb arròs", m:["dinar","sopar"], src:"guia 2",
   i:{arros:60, cigrons:200, espinacs:110, pebrot:100, aove:20, sesam:9}},
  {id:"d_amanida_completa", n:"Amanida completa de llenties i alvocat", m:["dinar","sopar"], src:"guia 2",
-  i:{llenties:200, canonges:80, tomaquet:110, cogombre:80, pa:60, alvocat:60, aove:15, lli:9}},
+  i:{llenties:200, canonges:80, tomaquet:110, cogombre:80, pa:95, alvocat:75, aove:20, lli:9}},
  {id:"d_seitan_patata", n:"Seitan a la planxa amb patata i bròquil", m:["dinar","sopar"], src:"guia 2",
   i:{seitan:130, patata:200, broquil:120, tomaquet:100, aove:20, sesam:9}},
 ];
@@ -239,12 +239,30 @@ function loadState(){
   try{ s = JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
   if(!s) s = {};
   s.weeks    = s.weeks    || {};   // {setmana: {data: {meals,postres,habits,validat,fotos}}}
-  s.custom   = s.custom   || [];   // plats creats per l'usuari
-  s.customIng= s.customIng|| {};   // aliments creats per l'usuari
+  s.custom   = s.custom   || [];   // plats creats de nou
+  s.customIng= s.customIng|| {};   // aliments creats de nou
+  s.editsPlats  = s.editsPlats  || {};  // modificacions sobre els plats que porta el programa
+  s.platsAmagats= s.platsAmagats|| [];  // plats retirats (no s'esborren, es poden recuperar)
+  s.editsIng    = s.editsIng    || {};  // modificacions sobre aliments i receptes de base
+  s.racions     = s.racions     || {};  // modificacions sobre les racions
+  s.canvis      = s.canvis      || [];  // qui ha canviat què i quan
+  s.missatges   = s.missatges   || [];  // taulell de missatges entre adults
+  s.pesos       = s.pesos       || {};  // {data: {kg, hora, nota, u}}
+  s.diari       = s.diari       || {};  // {data: {text, u}} observacions sense pesada
+  s.documents   = s.documents   || [];  // fitxers adjunts als missatges
   s.target   = s.target   || null; // objectius numèrics (només ordinador)
   s.pantry   = s.pantry   || {};
   s.rev      = s.rev      || 0;    // revisió, per a la sincronització
   return s;
+}
+
+/* Registre de canvis: qui toca les racions, els plats o les receptes.
+   Es guarden els 300 últims, prou per a qualsevol revisió. */
+function apuntarCanvi(que){
+  const qui = (typeof Sync!=="undefined" && Sync.est && Sync.est.email) ? Sync.est.email : "aquest aparell";
+  S.canvis = S.canvis || [];
+  S.canvis.unshift({quan:new Date().toISOString(), qui, que});
+  if(S.canvis.length > 300) S.canvis.length = 300;
 }
 let S = (typeof localStorage!=="undefined") ? loadState() : {weeks:{},custom:[],customIng:{},pantry:{},rev:0};
 
@@ -257,14 +275,40 @@ function saveState(silent){
   if(!silent && typeof Sync!=="undefined" && Sync.push) Sync.push();
 }
 
-/* aliments = base + els que hagi creat l'usuari */
-function allIng(){ return Object.assign({}, ING, S.customIng); }
+/* Aliments = els del programa (amb les modificacions que s'hi hagin fet)
+   més els que s'hagin creat de nou. */
+function allIng(){
+  const base = {};
+  for(const [k,v] of Object.entries(ING))
+    base[k] = (S.editsIng && S.editsIng[k]) ? Object.assign({}, v, S.editsIng[k], {editat:true}) : v;
+  return Object.assign(base, S.customIng||{});
+}
 function ing(k){ return allIng()[k]; }
-function DISHES(){ return BASE_DISHES.concat(S.custom||[]); }
+
+/* Plats = els del programa (amb modificacions, sense els retirats) més els nous */
+function DISHES(){
+  const edits = S.editsPlats||{}, fora = new Set(S.platsAmagats||[]);
+  const base = BASE_DISHES
+    .filter(d => !fora.has(d.id))
+    .map(d => edits[d.id] ? Object.assign({}, d, edits[d.id], {editat:true}) : d);
+  return base.concat((S.custom||[]).filter(d => !fora.has(d.id)));
+}
+/* Tots, inclosos els retirats: per a la pantalla d'edició i per poder
+   llegir el nom d'un plat antic que s'hagi retirat després. */
+function totsElsPlats(){
+  const edits = S.editsPlats||{}, fora = new Set(S.platsAmagats||[]);
+  const base = BASE_DISHES.map(d =>
+    Object.assign({}, d, edits[d.id]||{}, {editat:!!edits[d.id], base:true, amagat:fora.has(d.id)}));
+  const meus = (S.custom||[]).map(d => Object.assign({}, d, {base:false, amagat:fora.has(d.id)}));
+  return base.concat(meus);
+}
 function dishById(id){
   if(!id) return null;
-  return DISHES().find(d=>d.id===id) || POSTRES.find(d=>d.id===id) || null;
+  return DISHES().find(d=>d.id===id)
+      || totsElsPlats().find(d=>d.id===id)      // encara que s'hagi retirat
+      || POSTRES.find(d=>d.id===id) || null;
 }
+const esPlatBase = id => BASE_DISHES.some(d=>d.id===id);
 
 /* ---------------------------------------------------------------------
    5. DATES
@@ -293,12 +337,51 @@ function weekData(mon){
 }
 function dayData(dateStr){
   const w = weekData(parseDay(dateStr));
-  if(!w[dateStr]) w[dateStr] = {meals:{}, postres:{}, habits:[], validat:null, fotos:{}};
+  if(!w[dateStr]) w[dateStr] = {};
   const d = w[dateStr];
-  d.meals=d.meals||{}; d.postres=d.postres||{}; d.habits=d.habits||[]; d.fotos=d.fotos||{};
+  d.meals    = d.meals    || {};   // plat programat des de l'ordinador
+  d.custom   = d.custom   || {};   // àpat que ella ha construït element a element
+  d.fora     = d.fora     || {};   // àpat fet fora de casa, en text
+  d.sensacio = d.sensacio || {};   // v | t | r  (mai se li mostra l'històric)
+  d.postres  = d.postres  || {};
+  d.habits   = d.habits   || [];
+  d.fotos    = d.fotos    || {};
+  if(d.validat===undefined) d.validat = null;
   return d;
 }
 const esValidat = day => !!(day && day.validat);
+
+/* Les tres sensacions. Sense etiquetes de valor: només color i una
+   paraula neutra. No se'n mostra mai l'històric a l'aplicatiu d'ella. */
+const SENSACIONS = [
+  {id:"v", n:"Bé",       color:"#57a247"},
+  {id:"t", n:"Regular",  color:"#d9a219"},
+  {id:"r", n:"Malament", color:"#c0392b"},
+];
+
+/* ---------------------------------------------------------------------
+   Què hi ha en un àpat d'un dia. Té tres orígens possibles i aquesta
+   funció els unifica perquè la resta del codi no s'hi hagi de barallar:
+     · "plat"   — el que s'ha programat des de l'ordinador
+     · "lliure" — el que ella ha construït element a element
+     · "fora"   — un àpat fet fora de casa, anotat en text
+   L'àpat fet fora no es valora: no en sabem les quantitats i no té cap
+   sentit dir-li que li falta res d'un plat que ja s'ha menjat.
+   --------------------------------------------------------------------- */
+function apatDelDia(day, mealId){
+  if(!day) return null;
+  if(day.fora && day.fora[mealId]){
+    const f = day.fora[mealId];
+    return {tipus:"fora", n:f.text || "Àpat fora de casa", lloc:f.lloc||"", i:{}, valorable:false};
+  }
+  if(day.custom && day.custom[mealId]){
+    const c = day.custom[mealId];
+    return {tipus:"lliure", n:c.n || "Àpat adaptat", i:c.i || {}, valorable:true};
+  }
+  const d = dishById(day.meals[mealId]);
+  return d ? {tipus:"plat", id:d.id, n:d.n, i:d.i, valorable:true} : null;
+}
+const apatsFets = day => MEALS.filter(m => !!apatDelDia(day, m.id)).length;
 
 /* ---------------------------------------------------------------------
    6. QUANTITATS LLEGIBLES
@@ -386,7 +469,7 @@ function checkMeal(dishId, mealId){
 function dayItems(day){
   const all = {};
   const add = it => { for(const [k,g] of Object.entries(it||{})) all[k]=(all[k]||0)+g; };
-  for(const m of MEALS){ const d=dishById(day.meals[m.id]); if(d) add(d.i); }
+  for(const m of MEALS){ const a = apatDelDia(day, m.id); if(a) add(a.i); }
   for(const m of ["dinar","sopar"]){ const p=dishById(day.postres[m]); if(p) add(p.i); }
   return all;
 }
@@ -394,13 +477,17 @@ function checkDay(day){
   const items = dayItems(day);
   const s = structure(items);
   const f = [];
-  const fets = MEALS.filter(m=>day.meals[m.id]).length;
+  const fets = apatsFets(day);
+  /* Els àpats fets fora no els podem valorar: si n'hi ha cap, el dia
+     no es qualifica ni en positiu ni en negatiu. */
+  const nFora = MEALS.filter(m => day.fora && day.fora[m.id]).length;
   if(fets < 5) f.push("planificar els "+MEALS.length+" àpats");
   if(s.g.verd_c < 100 || s.g.verd_k < 100) f.push("verdura crua en un àpat i cuita en un altre");
   if(fruitPieces(items) < 3) f.push("arribar a 3 racions de fruita");
   const alt = postresAlternades(day);
   if(!alt.ok) f.push("alternar iogurt i fruita a les postres");
-  return {complet:f.length===0 && fets===5, falten:f, fets};
+  return {complet: f.length===0 && fets===5 && nFora===0,
+          falten:f, fets, nFora, valorable: nFora===0};
 }
 function fruitPieces(items){
   let g=0;
@@ -440,16 +527,18 @@ function proposarSetmana(mon, opcions){
     const day = dayData(iso(dt));
     if(esValidat(day)) continue;           // els dies validats no es toquen mai
     const usats = new Set(Object.values(day.meals));
+    /* tampoc toquem un àpat que ella ja hagi adaptat o fet fora */
+    const bloquejat = mid => (day.custom && day.custom[mid]) || (day.fora && day.fora[mid]);
 
     for(const mid of ["esmorzar","migmati","berenar"]){
-      if(day.meals[mid]) continue;
+      if(day.meals[mid] || bloquejat(mid)) continue;
       const p = P[mid]; if(p.length){ day.meals[mid] = p[i % p.length].id; canvis++; }
     }
-    if(!day.meals.dinar){
+    if(!day.meals.dinar && !bloquejat("dinar")){
       const p = P.dinar.filter(d=>!usats.has(d.id));
       if(p.length){ const d=p[(i*3)%p.length]; day.meals.dinar=d.id; usats.add(d.id); canvis++; }
     }
-    if(!day.meals.sopar){
+    if(!day.meals.sopar && !bloquejat("sopar")){
       const dDinar = dishById(day.meals.dinar);
       const volCrua = dDinar ? !teCrua(dDinar) : true;
       let p = P.sopar.filter(d=>!usats.has(d.id));
@@ -531,8 +620,292 @@ function qtyRef(k){
   return 100;
 }
 
+/* =====================================================================
+   11. SISTEMA D'EQUIVALÈNCIES (RACIONS)
+   ---------------------------------------------------------------------
+   La idea: cada grup té una "ració", i dins d'un grup tots els aliments
+   són intercanviables. Una ració de proteïna són 150 g de tofu, o 160 g
+   de llegums cuits, o 50 g de soja texturitzada en sec... Canviar d'un
+   a l'altre no altera el que menja, només l'aliment.
+
+   Això permet dues coses:
+   · que pugui adaptar un plat amb el que li vingui de gust i l'aplicatiu
+     li digui sol la quantitat correcta, sense haver de pensar-hi;
+   · que la nutricionista canviï una sola xifra i tots els plats i tots
+     els suggeriments quedin actualitzats alhora.
+
+   font: "guia" quan la quantitat surt literalment de les guies 1-3;
+         "equivalent" quan l'he deduïda per equivalència amb les que hi
+         consten. Les marcades com a equivalents són les primeres que
+         hauria de revisar la nutricionista.
+   --------------------------------------------------------------------- */
+const RACIONS_BASE = {
+  prot: {
+    n:"Proteïna", perApat:1,
+    ajuda:"Una ració a cada àpat principal",
+    aliments:{
+      tofu:      {g:150, font:"guia"},
+      soja_tex:  {g:50,  font:"guia", nota:"pes en sec"},
+      cigrons:   {g:160, font:"guia", nota:"pes cuit"},
+      llenties:  {g:160, font:"guia", nota:"pes cuit"},
+      mongetes:  {g:160, font:"guia", nota:"pes cuit"},
+      edamame:   {g:90,  font:"guia"},
+      hummus:    {g:90,  font:"guia", nota:"3 cullerades soperes"},
+      seitan:    {g:130, font:"equivalent"},
+      tempeh:    {g:130, font:"equivalent"},
+      ou:        {g:110, font:"equivalent", nota:"2 ous"},
+    }
+  },
+  hc: {
+    n:"Hidrats de carboni", perApat:1,
+    ajuda:"Una ració a cada àpat principal",
+    aliments:{
+      patata:    {g:200, font:"guia", nota:"pes en cru"},
+      moniato:   {g:350, font:"guia", nota:"pes en cru"},
+      quinoa:    {g:60,  font:"guia", nota:"pes en sec"},
+      arros:     {g:60,  font:"guia", nota:"pes en sec"},
+      pa:        {g:95,  font:"guia"},
+      avena:     {g:80,  font:"guia"},
+      pasta:     {g:60,  font:"equivalent", nota:"pes en sec"},
+    }
+  },
+  verd: {
+    n:"Verdura", perApat:2,
+    ajuda:"200 g per plat: dues racions, combinant colors",
+    aliments:{
+      tomaquet:{g:100, font:"guia", cru:true},
+      canonges:{g:100, font:"guia", cru:true},
+      cogombre:{g:100, font:"guia", cru:true},
+      pastanaga:{g:100, font:"guia", cru:true},
+      carbasso:{g:100, font:"guia"},
+      pebrot:  {g:100, font:"guia"},
+      broquil: {g:100, font:"guia"},
+      alberginia:{g:100, font:"guia"},
+      xampinyons:{g:100, font:"guia"},
+      espinacs:{g:100, font:"guia"},
+      ceba:    {g:100, font:"equivalent"},
+      gaspatxo:{g:250, font:"equivalent", cru:true, nota:"un got"},
+    }
+  },
+  greix: {
+    n:"Greixos saludables", perApat:2,
+    ajuda:"Dues racions DIFERENTS a cada àpat",
+    aliments:{
+      aove:     {g:20, font:"guia", nota:"2 cullerades"},
+      sesam:    {g:18, font:"guia", nota:"2 cullerades"},
+      lli:      {g:18, font:"guia", nota:"2 cullerades"},
+      ametlles: {g:40, font:"guia", nota:"un grapat"},
+      cacauets: {g:40, font:"guia", nota:"un grapat"},
+      nous:     {g:30, font:"equivalent", nota:"un grapat"},
+      tahini:   {g:15, font:"equivalent", nota:"1 cullerada"},
+      crema_ame:{g:25, font:"equivalent", nota:"1 cullerada"},
+      alvocat:  {g:75, font:"equivalent", nota:"mig alvocat"},
+    }
+  },
+  fruita: {
+    n:"Fruita", perApat:0,
+    ajuda:"Tres racions al dia: berenar i postres",
+    aliments:{
+      poma:{g:180, font:"guia"}, platan:{g:120, font:"guia"},
+      taronja:{g:200, font:"guia"}, pera:{g:170, font:"guia"},
+      kiwi:{g:90, font:"guia"}, press:{g:150, font:"guia"},
+      maduixes:{g:150, font:"guia"}, nabius:{g:150, font:"guia"},
+      mango:{g:150, font:"guia"},
+    }
+  },
+};
+
+/* Les racions es poden editar (nutricionista). Les modificacions viuen a
+   S.racions i es fusionen sobre les de base. */
+function racions(){
+  const r = JSON.parse(JSON.stringify(RACIONS_BASE));
+  for(const [grup, canvis] of Object.entries(S.racions||{})){
+    if(!r[grup]) r[grup] = {n:grup, perApat:1, aliments:{}};
+    if(canvis.perApat!=null) r[grup].perApat = canvis.perApat;
+    for(const [k,v] of Object.entries(canvis.aliments||{}))
+      r[grup].aliments[k] = Object.assign({}, r[grup].aliments[k], v, {font:"editat"});
+  }
+  return r;
+}
+
+/* Grup d'equivalència d'un aliment (verd_c i verd_k compten com "verd") */
+function grupRacio(k){
+  const R = racions();
+  for(const [grup, d] of Object.entries(R)) if(d.aliments[k]) return grup;
+  return null;
+}
+/* Grams que fan una ració d'aquest aliment */
+function gramsRacio(k){
+  const g = grupRacio(k); if(!g) return null;
+  return racions()[g].aliments[k].g;
+}
+/* Quantes racions són aquests grams */
+function comptaRacions(k, grams){
+  const g = gramsRacio(k);
+  return g ? grams/g : 0;
+}
+/* Alternatives per canviar un aliment sense desquadrar l'àpat.
+   Retorna [{k, n, grams, text, nota}] amb la quantitat ja calculada. */
+function equivalents(k, nRacions){
+  const grup = grupRacio(k); if(!grup) return [];
+  const n = nRacions || 1;
+  return Object.entries(racions()[grup].aliments)
+    .filter(([alt]) => alt!==k && ing(alt))
+    .map(([alt,d]) => {
+      const grams = Math.round(d.g*n);
+      return {k:alt, n:ing(alt).n, grams, text:qtyTxt(alt, grams), nota:d.nota||""};
+    })
+    .sort((a,b)=>a.n.localeCompare(b.n));
+}
+/* Totes les opcions d'un grup, per construir un àpat element a element */
+function opcionsGrup(grup, nRacions){
+  const R = racions()[grup]; if(!R) return [];
+  const n = nRacions || 1;
+  return Object.entries(R.aliments)
+    .filter(([k]) => ing(k))
+    .map(([k,d]) => {
+      const grams = Math.round(d.g*n);
+      return {k, n:ing(k).n, grams, text:qtyTxt(k, grams), nota:d.nota||"", cru:!!d.cru};
+    })
+    .sort((a,b)=>a.n.localeCompare(b.n));
+}
+
+/* Recompte de racions d'un conjunt d'ingredients */
+function racionsDe(items){
+  const R = racions();
+  const total = {}; for(const g of Object.keys(R)) total[g] = 0;
+  const perGrup = {};
+  for(const [k,q] of Object.entries(items||{})){
+    const grup = grupRacio(k); if(!grup || !q) continue;
+    const n = q / R[grup].aliments[k].g;
+    total[grup] += n;
+    (perGrup[grup] = perGrup[grup] || []).push({k, racions:n});
+  }
+  return {total, perGrup};
+}
+
+/* Què li falta a un àpat principal, en racions i redactat en positiu.
+   És el que fa servir el mòbil per dir "equilibrat" o "hi falta ...". */
+function faltaApat(items, mealId){
+  const R = racions(), r = racionsDe(items).total;
+  const f = [];
+  const arrodoneix = x => Math.round(x*10)/10;
+  if(mealId==="dinar" || mealId==="sopar"){
+    if(r.prot  < 0.85) f.push({grup:"prot",  t:"una font de proteïna",       falten:arrodoneix(1-r.prot)});
+    if(r.hc    < 0.85) f.push({grup:"hc",    t:"l'aliment dels hidrats",     falten:arrodoneix(1-r.hc)});
+    if(r.verd  < 1.85) f.push({grup:"verd",  t:"verdura fins a 200 g",       falten:arrodoneix(2-r.verd)});
+    const diferents = new Set((racionsDe(items).perGrup.greix||[])
+      .filter(x=>x.racions>=0.4).map(x=>x.k));
+    if(diferents.size < 2) f.push({grup:"greix", t:"un segon greix diferent", falten:1});
+  }
+  return {complet:f.length===0, falten:f, racions:r};
+}
+
+/* =====================================================================
+   12. TAULELL DE MISSATGES
+   ---------------------------------------------------------------------
+   Entre els adults que fan el seguiment: tu, la nutricionista i la
+   psicòloga. Viu només a l'aplicatiu d'ordinador. Tothom veu tots els
+   missatges; només consta qui l'escriu i qui l'ha llegit.
+   --------------------------------------------------------------------- */
+function quiSoc(){
+  return (typeof Sync!=="undefined" && Sync.est && Sync.est.email) ? Sync.est.email : null;
+}
+function escriureMissatge(text){
+  const t = (text||"").trim(); if(!t) return null;
+  const m = {id:"m"+Date.now()+Math.random().toString(36).slice(2,6),
+             quan:new Date().toISOString(), qui:quiSoc()||"aquest aparell",
+             text:t, llegits:{}};
+  S.missatges = S.missatges || [];
+  S.missatges.unshift(m);
+  if(S.missatges.length > 300) S.missatges.length = 300;
+  return m;
+}
+function esborrarMissatge(id){
+  S.missatges = (S.missatges||[]).filter(m=>m.id!==id);
+}
+/* Marca com a llegits tots els que no ha escrit un mateix. Retorna
+   quants n'ha marcat, per saber si cal desar. */
+function marcarLlegits(){
+  const jo = quiSoc(); if(!jo) return 0;
+  let n = 0;
+  for(const m of S.missatges||[]){
+    m.llegits = m.llegits || {};
+    if(m.qui!==jo && !m.llegits[jo]){ m.llegits[jo] = new Date().toISOString(); n++; }
+  }
+  return n;
+}
+function missatgesSenseLlegir(){
+  const jo = quiSoc(); if(!jo) return 0;
+  return (S.missatges||[]).filter(m=>m.qui!==jo && !(m.llegits||{})[jo]).length;
+}
+
+/* =====================================================================
+   13. PES
+   ---------------------------------------------------------------------
+   No apareix mai a l'aplicatiu d'ella. Es registra des de l'aplicatiu
+   del pare i es pot corregir des de l'ordinador.
+   Deliberadament no es calcula ni IMC ni cap objectiu: això és de
+   l'equip clínic, no d'una eina domèstica.
+   --------------------------------------------------------------------- */
+function desarPes(dataStr, kg, extra){
+  const v = parseFloat(String(kg).replace(",","."));
+  if(!(v>0) || v>400) return false;
+  S.pesos[dataStr] = Object.assign({}, S.pesos[dataStr], {
+    kg: Math.round(v*10)/10,
+    hora: (extra&&extra.hora) || "",
+    nota: (extra&&extra.nota) || "",
+    qui:  quiSoc() || (S.pesos[dataStr]&&S.pesos[dataStr].qui) || "aquest aparell",
+    u: Date.now()
+  });
+  return true;
+}
+function treurePes(dataStr){ delete S.pesos[dataStr]; }
+
+/* Observacions del dia sense pesada. Van a part perquè no tots els dies
+   es pesa, i les notes tenen valor per elles mateixes. */
+function desarNotaDia(dataStr, text){
+  const t = (text||"").trim();
+  if(!t) delete S.diari[dataStr];
+  else S.diari[dataStr] = {text:t, u:Date.now()};
+}
+function notaDia(dataStr){
+  return (S.diari[dataStr] && S.diari[dataStr].text) || "";
+}
+/* Totes les entrades del diari, amb el pes del dia si n'hi ha */
+function diariComplet(desde, fins){
+  const dies = new Set([...Object.keys(S.diari||{}), ...Object.keys(S.pesos||{})]);
+  return [...dies]
+    .filter(ds => (!desde || ds>=iso(desde)) && (!fins || ds<=iso(fins)))
+    .sort().reverse()
+    .map(ds => ({ds, d:parseDay(ds),
+                 text:(S.diari[ds]||{}).text || "",
+                 pes:(S.pesos[ds]||{}).kg || null,
+                 hora:(S.pesos[ds]||{}).hora || "",
+                 notaPes:(S.pesos[ds]||{}).nota || ""}));
+}
+
+/* Sèrie ordenada de pesades dins d'un interval */
+function seriePes(desde, fins){
+  return Object.entries(S.pesos||{})
+    .filter(([ds]) => (!desde || ds>=iso(desde)) && (!fins || ds<=iso(fins)))
+    .map(([ds,p]) => ({ds, d:parseDay(ds), kg:p.kg, hora:p.hora, nota:p.nota, qui:p.qui}))
+    .sort((a,b)=>a.ds.localeCompare(b.ds));
+}
+/* Mitjana mòbil. Mirar punts diaris fa veure patrons que no hi són:
+   el pes oscil·la més d'un quilo per líquids, digestió o cicle. */
+function tendenciaPes(serie, finestra){
+  const w = finestra || 7;
+  return serie.map((p,i) => {
+    const desde = p.d.getTime() - (w-1)*86400000;
+    const grup = serie.filter(x => x.d.getTime()>=desde && x.d.getTime()<=p.d.getTime());
+    const mitjana = grup.reduce((a,x)=>a+x.kg,0)/grup.length;
+    return {ds:p.ds, d:p.d, kg:p.kg, mitjana:Math.round(mitjana*100)/100, n:grup.length};
+  });
+}
+
 /* ---------------------------------------------------------------------
-   11. UTILITATS COMUNES
+   14. UTILITATS COMUNES
    --------------------------------------------------------------------- */
 const esc = s => String(s==null?"":s).replace(/[&<>"]/g,
   c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

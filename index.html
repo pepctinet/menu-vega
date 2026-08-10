@@ -37,16 +37,51 @@ header.top{background:var(--verd);color:#fff;padding:14px 0 0}
 .tabs button{padding:10px 16px;border-radius:10px 10px 0 0;font-size:14px;
  font-weight:600;opacity:.75;white-space:nowrap;color:#fff}
 .tabs button.on{background:var(--sorra);color:var(--verd-fosc);opacity:1}
-.estat-sinc{font-size:11.5px;opacity:.8;display:flex;align-items:center;gap:5px;
- margin-left:12px}
-.estat-sinc .p{width:7px;height:7px;border-radius:99px;background:#a8d18c}
-.estat-sinc .p.off{background:rgba(255,255,255,.4)}
-.estat-sinc .p.err{background:#f0c05a}
-/* accés discret: petita marca al peu de la capçalera */
-.pany{width:16px;height:16px;border-radius:99px;opacity:.22;margin-left:6px;
- background:#fff;flex:none}
-.pany:hover{opacity:.4}
-.pany.obert{opacity:.9;background:#ffe9a8}
+.estat-sinc{font-size:11.5px;display:flex;align-items:center;gap:6px;margin-left:12px;
+ color:#fff;background:rgba(255,255,255,.13);border-radius:99px;padding:3px 11px}
+.estat-sinc:hover{background:rgba(255,255,255,.24)}
+.estat-sinc .p{width:8px;height:8px;border-radius:99px;background:#5fd35f;flex:none;
+ box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.estat-sinc .p.off{background:#ff6b5e}
+.estat-sinc .p.err{background:#ffc043}
+
+/* ---------- porta d'entrada ---------- */
+.porta{position:fixed;inset:0;background:var(--sorra);z-index:200;display:flex;
+ align-items:center;justify-content:center;padding:24px}
+.porta .box{background:#fff;border:1px solid var(--linia);border-radius:18px;
+ box-shadow:0 20px 60px rgba(0,0,0,.10);width:100%;max-width:390px;padding:28px 26px}
+.porta h2{font-size:21px;margin-bottom:3px}
+.porta .s{font-size:13px;color:var(--gris);margin-bottom:20px}
+.porta input{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:11px;
+ font-size:15px;background:#fdfdfb;margin-bottom:10px}
+.porta input:focus{outline:2px solid var(--verd-clar);border-color:var(--verd)}
+.porta .err{color:var(--vermell);font-size:13px;min-height:19px;margin-top:4px}
+.porta .peu{font-size:12px;color:var(--gris);margin-top:16px;line-height:1.5}
+.badge{background:var(--vermell);color:#fff;border-radius:99px;font-size:10px;
+ padding:1px 6px;font-weight:800;margin-left:5px;vertical-align:1px}
+
+/* ---------- taulell de missatges ---------- */
+.msg{border:1px solid var(--linia);border-radius:13px;padding:13px 15px;margin-bottom:9px;
+ background:#fff}
+.msg.meu{background:var(--verd-clar);border-color:#cfe0c5}
+.msg.nou{border-color:var(--verd);box-shadow:0 0 0 2px var(--verd-clar)}
+.msg .cap{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+ margin-bottom:6px}
+.msg .qui{font-weight:700;font-size:13.5px}
+.msg .quan{font-size:11.5px;color:var(--gris);white-space:nowrap}
+.msg .txt{font-size:14.5px;white-space:pre-wrap;line-height:1.5}
+.msg .peu{font-size:11.5px;color:var(--gris);margin-top:8px;display:flex;
+ justify-content:space-between;gap:10px;align-items:center}
+textarea.msgbox{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
+ font-size:14.5px;background:#fdfdfb;min-height:90px;resize:vertical;font-family:inherit}
+
+/* ---------- pes ---------- */
+.pesgraf{width:100%;height:230px;display:block}
+.pesgraf .eix{stroke:#e2ded2;stroke-width:1}
+.pesgraf .tend{fill:none;stroke:var(--verd);stroke-width:2.5;stroke-linejoin:round;
+ stroke-linecap:round}
+.pesgraf .punt{fill:#c9c5b6}
+.pesgraf text{font-size:10px;fill:#8a8a80}
 
 .card{background:var(--paper);border:1px solid var(--linia);border-radius:var(--r);
  box-shadow:var(--ombra)}
@@ -198,9 +233,9 @@ tr:last-child td{border-bottom:none}
       <div>
         <h1 id="titol">Menú Vega</h1>
         <div class="sub row">
-          <span>Seguiment de les indicacions de la nutricionista</span>
-          <span class="estat-sinc" id="estatSinc"><span class="p off"></span><span id="estatTxt">…</span></span>
-          <span class="pany" id="pany" title=""></span>
+          <span>Seguiment de les indicacions</span>
+          <button class="estat-sinc" id="estatSinc" title="Clica per iniciar o tancar la sessió">
+            <span class="p off"></span><span id="estatTxt">…</span></button>
         </div>
       </div>
       <div class="weeknav">
@@ -237,71 +272,72 @@ tr:last-child td{border-bottom:none}
 /* Empremta SHA-256 de la contrasenya. Al codi no hi ha el text de la
    contrasenya: només aquesta empremta, de la qual no es pot recuperar.
    Per canviar-la, calcula l'SHA-256 de la nova i substitueix-la aquí. */
-const CONTRASENYA_HASH = "bcd88ea49b9eddba23fcd2d6c2b8a1c6fedc3ec2dc197d2fe5ded0b10aa77c36";
-
-async function sha256(text){
-  const dades = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest("SHA-256", dades);
-  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-
-let obert = sessionStorage.getItem("mv_obert")==="1";
 let cursor = monday(TODAY);
 let tab = "setmana";
 
 /* ---------------------------------------------------------------------
-   ACCÉS DISCRET
-   Tres clics seguits sobre el títol, o la marca petita del costat.
-   No hi ha cap text que anunciï que existeix una part protegida.
+   PORTA D'ENTRADA
+   L'aplicatiu no ensenya res fins que algú ha iniciat la sessió amb el
+   seu compte. No hi ha cap contrasenya compartida: qui ets determina
+   què veus, i queda apuntat qui canvia què.
+
+   Si no hi ha connexió amb el servidor (o el fitxer s'obre en local per
+   fer proves) l'aplicatiu funciona igual amb les dades d'aquest aparell,
+   avisant-ne. Això vol dir que la porta ordena, però no és una caixa
+   forta: qui tingui l'ordinador i el desconnecti hi pot entrar.
    --------------------------------------------------------------------- */
-let clics = 0, clicT = null;
-function provarObrir(){
-  clics++; clearTimeout(clicT);
-  clicT = setTimeout(()=>clics=0, 1400);
-  if(clics>=3){ clics=0; demanarContrasenya(); }
+function sessioIniciada(){ return Sync.est.estat === "connectat"; }
+function modeLocal(){ return !Sync.configurat() || Sync.est.estat === "error"; }
+/* "obert" vol dir: es poden veure els números i tot el seguiment */
+function estaObert(){ return sessioIniciada() || modeLocal(); }
+Object.defineProperty(window, "obert", {get: estaObert});
+
+function pintarPorta(){
+  const cal = Sync.configurat() && !sessioIniciada() && Sync.est.estat!=="error"
+              && Sync.est.estat!=="carregant";
+  let p = document.getElementById("porta");
+  if(!cal){ if(p) p.remove(); return; }
+  if(p) return;
+  p = document.createElement("div");
+  p.className = "porta"; p.id = "porta";
+  p.innerHTML = `<div class="box">
+      <h2>Seguiment Mar</h2>
+      <div class="s">Inicia la sessió amb el teu compte</div>
+      <input id="poEmail" type="email" placeholder="Usuari" autocomplete="username">
+      <input id="poPass" type="password" placeholder="Contrasenya" autocomplete="current-password">
+      <div class="err" id="poErr"></div>
+      <button class="btn" style="width:100%;padding:12px" onclick="entrarPorta()">Entrar</button>
+      <div class="peu">Cada persona entra amb el seu compte: tu, la nutricionista
+        i la psicòloga. Queda registrat qui modifica el pla.</div>
+    </div>`;
+  document.body.appendChild(p);
+  const em = document.getElementById("poEmail");
+  const pw = document.getElementById("poPass");
+  const anar = e => { if(e.key==="Enter") entrarPorta(); };
+  em.addEventListener("keydown", anar); pw.addEventListener("keydown", anar);
+  setTimeout(()=>em.focus(), 60);
 }
-$("#titol").addEventListener("click", provarObrir);
-$("#pany").addEventListener("click", provarObrir);
-document.addEventListener("keydown", e=>{
-  if(e.ctrlKey && e.shiftKey && (e.key==="n"||e.key==="N")){ e.preventDefault(); demanarContrasenya(); }
-});
-function demanarContrasenya(){
-  if(obert){ tancarSessio(); return; }
-  openModal(`<div class="mhead"><h3>Accés</h3>
-    <button class="close" onclick="closeModal()">×</button></div>
-    <div class="mbody">
-      <input class="search" id="pw" type="password" placeholder="Contrasenya"
-        onkeydown="if(event.key==='Enter')validarContrasenya()">
-      <div id="pwErr" class="small" style="color:var(--vermell);min-height:18px"></div>
-      <button class="btn" onclick="validarContrasenya()">Entrar</button>
-    </div>`, true);
-  setTimeout(()=>{ const p=$("#pw"); if(p) p.focus(); }, 40);
-}
-async function validarContrasenya(){
-  const camp = $("#pw");
-  if(!camp) return;
-  let coincideix = false;
+async function entrarPorta(){
+  const err = document.getElementById("poErr");
+  err.textContent = "";
   try{
-    coincideix = (await sha256(camp.value)) === CONTRASENYA_HASH;
+    await Sync.login(document.getElementById("poEmail").value.trim(),
+                     document.getElementById("poPass").value);
   }catch(e){
-    /* crypto.subtle només existeix en https:// i en fitxers locals.
-       Si el navegador el bloqueja, avisem en comptes de fallar en silenci. */
-    $("#pwErr").textContent = "Aquest navegador no permet comprovar la contrasenya aquí.";
-    return;
+    err.textContent = /password|credential|user-not-found|invalid/i.test(e.code||e.message)
+      ? "L'usuari o la contrasenya no són correctes."
+      : "No s'ha pogut entrar. Comprova la connexió.";
   }
-  if(coincideix){
-    obert = true; sessionStorage.setItem("mv_obert","1");
-    closeModal(); render();
+}
+$("#estatSinc").addEventListener("click", ()=>{
+  if(sessioIniciada()){
+    if(confirm("Vols tancar la sessió?")) Sync.logout();
+  } else if(Sync.configurat()){
+    pintarPorta();
   } else {
-    $("#pwErr").textContent = "No és correcta.";
-    camp.value = ""; camp.focus();
+    alert("Aquest aparell encara no està connectat al servidor.");
   }
-}
-function tancarSessio(){
-  obert = false; sessionStorage.removeItem("mv_obert");
-  if(tab==="registre"||tab==="fotos") tab="setmana";
-  render();
-}
+});
 
 /* ---------------------------------------------------------------------
    PRESENTACIÓ
@@ -358,20 +394,27 @@ function viewSetmana(){
                           : (chk.complet?`<span class="dot v" title="Equilibrat"></span>`:"")) : ""}
       </div></div><div class="dbody">`;
     for(const m of MEALS){
-      const d = dishById(day.meals[m.id]);
-      const c = d ? checkMeal(d.id, m.id) : null;
+      const a = apatDelDia(day, m.id);
+      const d = (a && a.tipus==="plat") ? dishById(a.id) : null;
+      const c = (a && a.valorable) ? faltaApat(a.i, m.id) : null;
       const ms = (obert && d) ? scoreMealFull(d.id, m.id) : null;
       const foto = day.fotos && day.fotos[m.id];
+      const sens = day.sensacio && day.sensacio[m.id];
+      const sensCol = sens ? (SENSACIONS.find(x=>x.id===sens)||{}).color : null;
       html += `<div class="slot${val?" block":""}" ${val?"":`onclick="obrirTria('${ds}','${m.id}')"`}>
         <div class="row" style="justify-content:space-between">
           <span class="lbl">${m.n} · ${m.h}</span>
           <span class="row" style="gap:4px">
+            ${sensCol?`<span class="dot" style="background:${sensCol}" title="Sensació registrada"></span>`:""}
             ${foto&&obert?`<span class="xs" title="Té foto">◉</span>`:""}
-            ${ms?`<span class="dot ${ms.lvl}"></span>`:(c&&c.complet?`<span class="dot v"></span>`:"")}
+            ${ms?`<span class="dot ${ms.lvl}"></span>`
+                :(c&&c.complet?`<span class="dot v"></span>`:"")}
           </span>
         </div>
-        <div class="nm ${d?"":"empty"}">${d?esc(d.n):"— triar —"}</div>
-        ${d?`<div class="xs muted" style="margin-top:3px">${esc(ingListShort(d.i,3))}</div>`:""}
+        <div class="nm ${a?"":"empty"}">${a?esc(a.n):"— triar —"}</div>
+        ${a && a.tipus!=="plat" ? `<div class="xs" style="margin-top:2px">
+            <span class="tag ${a.tipus==="fora"?"blau":""}">${a.tipus==="fora"?"fora de casa":"adaptat per ella"}</span></div>` : ""}
+        ${a && a.tipus!=="fora" ? `<div class="xs muted" style="margin-top:3px">${esc(ingListShort(a.i,3))}</div>` : ""}
       </div>`;
       if(m.id==="dinar"||m.id==="sopar"){
         const p = dishById(day.postres[m.id]);
@@ -525,13 +568,21 @@ function obrirDia(ds){
 
   h += `<div class="sec-title"><h2 style="font-size:15px">Àpats</h2></div><table>`;
   for(const m of MEALS){
-    const d = dishById(day.meals[m.id]);
-    const c = d ? checkMeal(d.id,m.id) : null;
+    const a = apatDelDia(day, m.id);
+    const d = (a && a.tipus==="plat") ? dishById(a.id) : null;
+    const c = (a && a.valorable) ? faltaApat(a.i, m.id) : null;
     const ms = (obert&&d) ? scoreMealFull(d.id,m.id) : null;
+    const sens = day.sensacio && day.sensacio[m.id];
+    const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
     h += `<tr><td style="width:92px"><b>${m.n}</b><div class="xs muted">${m.h}</div></td>
-      <td>${d?esc(d.n):'<span class="muted">—</span>'}
-      ${d?`<div class="xs muted">${esc(ingList(d.i))}</div>`:""}
-      ${d&&!obert&&c.falten.length?`<div class="xs muted">Hi pots afegir: ${c.falten.map(esc).join(" · ")}</div>`:""}</td>
+      <td>${a?esc(a.n):'<span class="muted">—</span>'}
+      ${a && a.tipus==="fora" ? `<div class="xs"><span class="tag blau">fora de casa</span>
+          ${a.lloc?" "+esc(a.lloc):""}</div>` : ""}
+      ${a && a.tipus==="lliure" ? `<div class="xs"><span class="tag">adaptat per ella</span></div>` : ""}
+      ${a && a.tipus!=="fora" ? `<div class="xs muted">${esc(ingList(a.i))}</div>` : ""}
+      ${c && c.falten.length ? `<div class="xs muted">Hi falta: ${c.falten.map(x=>esc(x.t)).join(" · ")}</div>` : ""}
+      ${sd ? `<div class="xs" style="margin-top:2px"><span class="dot" style="background:${sd.color}"></span>
+          <span class="muted">s'hi ha sentit ${esc(sd.n.toLowerCase())}</span></div>` : ""}</td>
       <td style="width:34px">${ms?`<span class="dot ${ms.lvl}"></span>`
         :(c&&c.complet?`<span class="dot v"></span>`:"")}</td></tr>`;
     if(m.id==="dinar"||m.id==="sopar"){
@@ -682,14 +733,18 @@ function guardarSetmanaSencera(){
 /* =====================================================================
    CONFIGURADOR
    ===================================================================== */
-let cfg = {n:"", m:["dinar","sopar"], i:{}, editant:null};
-function cfgFrom(id){
+let cfg = {n:"", m:["dinar","sopar"], i:{}, editant:null, base:false};
+/* mode: "editar" (per defecte si el plat existeix) o "duplicar" */
+function cfgFrom(id, mode){
   if(id){
     const d = dishById(id);
-    const meu = (S.custom||[]).some(x=>x.id===id);
-    cfg = {n:d.n+(meu?"":" (còpia)"), m:d.m.slice(), i:Object.assign({},d.i),
-           editant: meu ? id : null};
-  } else cfg = {n:"", m:["dinar","sopar"], i:{}, editant:null};
+    if(mode==="duplicar"){
+      cfg = {n:d.n+" (còpia)", m:d.m.slice(), i:Object.assign({},d.i), editant:null, base:false};
+    } else {
+      cfg = {n:d.n, m:d.m.slice(), i:Object.assign({},d.i),
+             editant:id, base:esPlatBase(id)};
+    }
+  } else cfg = {n:"", m:["dinar","sopar"], i:{}, editant:null, base:false};
   tab = "configurador"; render();
 }
 function viewConfigurador(){
@@ -746,7 +801,12 @@ function viewConfigurador(){
       <div class="row">
         <button class="btn" onclick="cfgSave()">${cfg.editant?"Desar els canvis":"Desar el plat"}</button>
         <button class="btn ghost" onclick="cfgFrom(null)">Començar de nou</button>
-      </div></div></div></div>`;
+        ${cfg.editant?`<button class="btn ghost" onclick="tab='plats';render()">Cancel·lar</button>`:""}
+      </div>
+      ${cfg.editant&&cfg.base?`<div class="xs muted" style="margin-top:8px">
+        Estàs modificant un plat que porta el programa. L'original es conserva i el podràs
+        recuperar des de la llista de plats.</div>`:""}
+      </div></div></div>`;
 
   if((S.custom||[]).length){
     h += `<div class="sec-title"><h2>Els meus plats</h2>
@@ -808,22 +868,52 @@ function cfgSave(){
   if(!cfg.n.trim())               return alert("Posa un nom al plat.");
   if(!Object.keys(cfg.i).length)  return alert("Afegeix com a mínim un ingredient.");
   if(!cfg.m.length)               return alert("Tria en quins àpats es pot fer servir.");
-  if(cfg.editant){
+  const dades = {n:cfg.n.trim(), m:cfg.m.slice(), i:Object.assign({},cfg.i)};
+  if(cfg.editant && cfg.base){
+    /* És un plat que porta el programa: guardem la modificació a sobre,
+       de manera que l'original no es perd i es pot recuperar. */
+    S.editsPlats[cfg.editant] = dades;
+    apuntarCanvi("Ha modificat el plat «"+dades.n+"»");
+  } else if(cfg.editant){
     const d = S.custom.find(x=>x.id===cfg.editant);
-    d.n = cfg.n.trim(); d.m = cfg.m.slice(); d.i = Object.assign({}, cfg.i);
+    Object.assign(d, dades);
+    apuntarCanvi("Ha modificat el plat «"+dades.n+"»");
   } else {
-    S.custom.push({id:"c"+Date.now(), n:cfg.n.trim(), m:cfg.m.slice(),
-                   i:Object.assign({},cfg.i), src:"meu"});
+    S.custom.push(Object.assign({id:"c"+Date.now(), src:"afegit"}, dades));
+    apuntarCanvi("Ha afegit el plat «"+dades.n+"»");
   }
   tocarConfig();
-  cfg = {n:"", m:["dinar","sopar"], i:{}, editant:null};
-  render();
+  cfg = {n:"", m:["dinar","sopar"], i:{}, editant:null, base:false};
+  tab = "plats"; render();
 }
-function esborrarPlat(id){
-  if(!confirm("Esborrar aquest plat? Els dies que el fan servir es quedaran sense aquell àpat.")) return;
-  S.custom = S.custom.filter(d=>d.id!==id);
+function restaurarPlat(id){
+  const d = BASE_DISHES.find(x=>x.id===id);
+  if(!confirm("Tornar «"+(dishById(id)||{n:""}).n+"» a com venia de fàbrica?")) return;
+  delete S.editsPlats[id];
+  apuntarCanvi("Ha restaurat el plat original «"+(d?d.n:id)+"»");
   tocarConfig(); render();
 }
+function retirarPlat(id){
+  const d = dishById(id);
+  const base = esPlatBase(id);
+  if(!confirm(base
+      ? "Retirar «"+d.n+"»? Deixarà de sortir a les llistes, però el podràs recuperar quan vulguis."
+      : "Esborrar «"+d.n+"»? Aquest l'has afegit tu i s'esborra del tot.")) return;
+  if(base){
+    S.platsAmagats = [...new Set([...(S.platsAmagats||[]), id])];
+    apuntarCanvi("Ha retirat el plat «"+d.n+"»");
+  } else {
+    S.custom = S.custom.filter(x=>x.id!==id);
+    apuntarCanvi("Ha esborrat el plat «"+d.n+"»");
+  }
+  tocarConfig(); render();
+}
+function tornarPlat(id){
+  S.platsAmagats = (S.platsAmagats||[]).filter(x=>x!==id);
+  apuntarCanvi("Ha tornat a posar el plat «"+(dishById(id)||{n:id}).n+"»");
+  tocarConfig(); render();
+}
+const esborrarPlat = retirarPlat;   // compatibilitat amb crides antigues
 
 /* --- crear o editar un aliment (a qualsevol grup) --- */
 function nouAliment(cat, editar){
@@ -901,6 +991,326 @@ function esborrarAliment(k){
   if(!confirm("Esborrar aquest aliment? Els plats que el fan servir el deixaran de mostrar.")) return;
   delete S.customIng[k];
   tocarConfig(); render();
+}
+
+/* =====================================================================
+   PLATS · el catàleg sencer, editable
+   ===================================================================== */
+let filtrePlats = "tots", cercaPlats = "", seccioPlats = "plats";
+
+function viewPlats(){
+  let h = `<div class="sec-title"><h2>Plats, receptes i quantitats</h2>
+    <span class="muted small">Tot el que hi ha al programa es pot canviar</span>
+    <span style="margin-left:auto" class="no-print">`+
+    [["plats","Plats"],["receptes","Receptes"],["racions","Quantitats per ració"],["canvis","Registre de canvis"]]
+      .map(([k,n])=>`<button class="btn ${seccioPlats===k?"":"ghost"} sm"
+        onclick="seccioPlats='${k}';render()">${n}</button>`).join(" ")+
+    `</span></div>`;
+  if(seccioPlats==="receptes") return h + seccioReceptes();
+  if(seccioPlats==="racions")  return h + seccioRacions();
+  if(seccioPlats==="canvis")   return h + seccioCanvis();
+
+  /* --- llistat de plats --- */
+  const tots = totsElsPlats();
+  const actius = tots.filter(d=>!d.amagat);
+  const retirats = tots.filter(d=>d.amagat);
+  const q = cercaPlats.toLowerCase().trim();
+  let list = actius;
+  if(filtrePlats!=="tots") list = list.filter(d=>d.m.includes(filtrePlats));
+  if(q) list = list.filter(d=>d.n.toLowerCase().includes(q) ||
+      Object.keys(d.i).some(k=>ing(k)&&ing(k).n.toLowerCase().includes(q)));
+  list = list.slice().sort((a,b)=>a.n.localeCompare(b.n));
+
+  h += `<div class="card pad" style="margin-bottom:14px">
+    <div class="row" style="flex-wrap:wrap;gap:8px">
+      <input class="search" style="flex:1;min-width:200px;margin:0" placeholder="Cercar plat o ingredient…"
+        value="${esc(cercaPlats)}" oninput="cercaPlats=this.value;render()">
+      <button class="btn" onclick="cfgFrom(null)">+ Afegir un plat</button>
+    </div>
+    <div class="chips" style="margin-top:10px">`+
+    [["tots","Tots"]].concat(MEALS.map(m=>[m.id,m.n]))
+      .map(([k,n])=>`<button class="chip ${filtrePlats===k?"on":""}"
+        onclick="filtrePlats='${k}';render()">${n}</button>`).join("")+
+    `</div></div>`;
+
+  h += `<div class="card pad"><div class="small muted" style="margin-bottom:10px">
+    ${list.length} plat${list.length===1?"":"s"}</div><div class="dishlist" style="max-height:none">`;
+  h += list.length ? list.map(d=>{
+      const mealRef = d.m.includes("sopar")?"sopar":d.m[0];
+      const f = (mealRef==="dinar"||mealRef==="sopar") ? faltaApat(d.i, mealRef) : checkMeal(d.id, mealRef);
+      const ms = obert ? scoreMealFull(d.id, mealRef) : null;
+      return `<div class="dish" style="cursor:default">
+        ${ms?`<span class="dot ${ms.lvl}" style="margin-top:6px"></span>`
+            :(f.complet?`<span class="dot v" style="margin-top:6px"></span>`
+                       :`<span class="dot" style="margin-top:6px;background:#e0ddd2"></span>`)}
+        <div class="info">
+          <div class="t">${esc(d.n)}
+            ${d.base?"":'<span class="tag">afegit</span>'}
+            ${d.editat?'<span class="tag blau">modificat</span>':""}
+            ${d.src&&d.base&&!d.editat?`<span class="tag">${esc(d.src)}</span>`:""}</div>
+          <div class="xs muted" style="margin-top:2px">${d.m.map(x=>(MEALS.find(y=>y.id===x)||{n:x}).n).join(" · ")}</div>
+          <div class="ing">${esc(ingList(d.i))}</div>
+          ${!f.complet ? `<div class="xs" style="color:#8a6410;margin-top:3px">Hi falta:
+            ${(f.falten||[]).map(x=>esc(x.t||x)).join(" · ")}</div>` : ""}
+          ${obert?`<div class="mac">${Math.round(ms.t.kcal)} kcal · ${Math.round(ms.t.p)} g P · ${Math.round(ms.t.c)} g HC · ${Math.round(ms.t.f)} g G</div>`:""}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <button class="btn ghost sm" onclick="cfgFrom('${d.id}')">editar</button>
+          <button class="btn ghost sm" onclick="cfgFrom('${d.id}','duplicar')">duplicar</button>
+          ${d.editat?`<button class="btn ghost sm" onclick="restaurarPlat('${d.id}')">original</button>`:""}
+          <button class="btn danger sm" onclick="retirarPlat('${d.id}')">${d.base?"retirar":"esborrar"}</button>
+        </div></div>`;
+    }).join("") : `<div class="muted pad">Cap plat amb aquest filtre.</div>`;
+  h += `</div></div>`;
+
+  if(retirats.length){
+    h += `<div class="sec-title"><h2>Plats retirats</h2>
+      <span class="muted small">no surten a les llistes, però es poden recuperar</span></div>
+      <div class="card pad"><table>`+
+      retirats.map(d=>`<tr><td>${esc(d.n)}</td>
+        <td class="xs muted">${esc(ingListShort(d.i,4))}</td>
+        <td style="width:110px"><button class="btn ghost sm" onclick="tornarPlat('${d.id}')">tornar-lo a posar</button></td>
+        </tr>`).join("")+`</table></div>`;
+  }
+  return h;
+}
+
+/* --- receptes de les elaboracions --- */
+function seccioReceptes(){
+  const A = allIng();
+  const preps = Object.entries(A).filter(([k,v])=>v.prep);
+  let h = `<div class="card pad"><div class="spread" style="margin-bottom:12px">
+    <div class="small muted" style="max-width:640px">
+    Aquestes són les elaboracions que es fan a casa. El text és el que es veu <b>també al mòbil</b>,
+    perquè ella pugui preparar-les. La composició serveix perquè la llista de la compra sàpiga
+    quins ingredients calen: si canvies la recepta, canvia-la també aquí.</div>
+    <button class="btn" onclick="novaRecepta()">+ Afegir una recepta</button></div>`;
+  for(const [k,v] of preps){
+    h += `<div style="border:1px solid var(--linia);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div class="spread"><b style="font-size:15px">${esc(v.n)}</b>
+        ${v.editat?'<span class="tag blau">modificada</span>':""}</div>
+      <textarea class="search" id="rec_${k}" style="min-height:110px;margin-top:10px;font-family:inherit"
+        >${esc(v.recepta||"")}</textarea>
+      <div class="xs muted" style="margin:6px 0 4px">Composició per cada 100 g de producte acabat:</div>
+      <div class="row" style="flex-wrap:wrap;gap:6px">`+
+      Object.entries(v.prep||{}).map(([sk,g])=>
+        `<span class="row" style="gap:4px;border:1px solid var(--linia);border-radius:9px;padding:4px 8px">
+          <span class="xs">${esc(A[sk]?A[sk].n:sk)}</span>
+          <input type="number" step="0.1" id="prep_${k}_${sk}" value="${g}"
+            style="width:62px;padding:3px 5px;border:1px solid var(--linia);border-radius:6px;text-align:right">
+          <span class="xs muted">g</span></span>`).join("")+
+      `</div>
+      <div class="row" style="margin-top:11px">
+        <button class="btn sm" onclick="desarRecepta('${k}')">Desar</button>
+        ${v.editat?`<button class="btn ghost sm" onclick="restaurarRecepta('${k}')">Tornar a l'original</button>`:""}
+        ${v.meu?`<button class="btn danger sm" onclick="esborrarRecepta('${k}')">Esborrar</button>`:""}
+        ${v.prep&&Object.keys(v.prep).length<12
+          ? `<button class="btn ghost sm" onclick="afegirIngRecepta('${k}')">+ ingredient</button>`:""}
+      </div></div>`;
+  }
+  if(!preps.length) h += `<div class="muted">Encara no hi ha cap recepta.</div>`;
+  return h+`</div>`;
+}
+
+/* --- afegir una recepta nova --- */
+function novaRecepta(){
+  const A = allIng();
+  openModal(`<div class="mhead"><div><h3>Nova recepta</h3>
+      <div class="small muted">Apareixerà a l'aplicatiu del mòbil i a la llista de la compra</div></div>
+    <button class="close" onclick="closeModal()">×</button></div><div class="mbody">
+    <input class="search" id="nr_n" placeholder="Nom, per exemple: Crema de llenties">
+    <div class="row" style="gap:10px;margin-bottom:10px">
+      <div style="flex:1"><div class="xs muted" style="margin-bottom:4px">A quin grup compta</div>
+        <select class="search" style="margin:0" id="nr_cat">`+
+        CATS.map(c=>`<option value="${c.k}">${esc(c.t)}</option>`).join("")+`</select></div>
+      <div style="flex:1"><div class="xs muted" style="margin-bottom:4px">Es mesura en</div>
+        <select class="search" style="margin:0" id="nr_ml">
+          <option value="g">grams</option><option value="ml">mil·lilitres</option></select></div>
+    </div>
+    <div class="row" style="gap:10px;margin-bottom:10px">
+      <div style="flex:1"><div class="xs muted" style="margin-bottom:4px">Ració de referència</div>
+        <input class="search" style="margin:0" type="number" id="nr_q" value="100"></div>
+      <div style="flex:1"><div class="xs muted" style="margin-bottom:4px">Unitat casolana (opcional)</div>
+        <input class="search" style="margin:0" id="nr_ul" placeholder="cullerada, got, boleta…"></div>
+      <div style="flex:1"><div class="xs muted" style="margin-bottom:4px">Pes d'aquesta unitat</div>
+        <input class="search" style="margin:0" type="number" id="nr_uq" placeholder="p. ex. 45"></div>
+    </div>
+    <div class="xs muted" style="margin-bottom:5px">Com es fa</div>
+    <textarea class="msgbox" id="nr_txt" style="min-height:120px"
+      placeholder="Ingredients i passos, tal com vulguis que ho llegeixi ella."></textarea>
+    <div class="xs muted" style="margin:12px 0 5px">Composició per cada 100 ${""} del producte acabat.
+      Serveix només per a la llista de la compra; la pots deixar buida i afegir-la després.</div>
+    <div id="nr_comp"></div>
+    <button class="btn ghost sm" onclick="afegirFilaComp()">+ ingredient</button>
+    <button class="btn" style="margin-top:14px;display:block;width:100%" onclick="desarNovaRecepta()">Crear la recepta</button>
+    </div>`);
+  compFiles = [];
+  afegirFilaComp();
+  setTimeout(()=>{ const n=$("#nr_n"); if(n) n.focus(); },40);
+}
+let compFiles = [];
+function afegirFilaComp(){
+  const A = allIng();
+  const idx = compFiles.length;
+  compFiles.push(idx);
+  const opcions = Object.entries(A).filter(([k,v])=>!v.prep)
+    .sort((a,b)=>a[1].n.localeCompare(b[1].n))
+    .map(([k,v])=>`<option value="${k}">${esc(v.n)}</option>`).join("");
+  const cont = document.getElementById("nr_comp");
+  const div = document.createElement("div");
+  div.className = "row";
+  div.style.cssText = "gap:8px;margin-bottom:7px";
+  div.innerHTML = `<select class="search" style="margin:0;flex:1" id="nc_k_${idx}">${opcions}</select>
+    <input class="search" style="margin:0;width:90px" type="number" step="0.1" id="nc_g_${idx}" placeholder="g/100">
+    <button class="close" onclick="this.parentNode.remove()">×</button>`;
+  cont.appendChild(div);
+}
+function desarNovaRecepta(){
+  const nom = $("#nr_n").value.trim();
+  if(!nom) return alert("Posa un nom a la recepta.");
+  const txt = $("#nr_txt").value.trim();
+  if(!txt) return alert("Escriu com es fa.");
+  const prep = {};
+  for(const i of compFiles){
+    const ks = document.getElementById("nc_k_"+i), gs = document.getElementById("nc_g_"+i);
+    if(!ks || !gs || !gs.value) continue;
+    prep[ks.value] = (prep[ks.value]||0) + (+gs.value||0);
+  }
+  const k = "r_"+nom.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")+"_"+Date.now().toString(36);
+  const o = {n:nom, cat:$("#nr_cat").value, shop:"Elaboracions",
+             ml:$("#nr_ml").value==="ml", qtyRef:+$("#nr_q").value||100,
+             recepta:txt, prep, meu:true};
+  const ul = $("#nr_ul").value.trim(), uq = +$("#nr_uq").value;
+  if(ul && uq>0){ o.ul = ul; o.uq = uq; }
+  S.customIng[k] = o;
+  QTY_REF[k] = o.qtyRef;
+  apuntarCanvi("Ha afegit la recepta «"+nom+"»");
+  tocarConfig(); closeModal(); render();
+}
+function esborrarRecepta(k){
+  if(!confirm("Esborrar aquesta recepta?")) return;
+  const n = ing(k).n;
+  delete S.customIng[k];
+  apuntarCanvi("Ha esborrat la recepta «"+n+"»");
+  tocarConfig(); render();
+}
+function afegirIngRecepta(k){
+  const A = allIng();
+  const opcions = Object.entries(A).filter(([ik,v])=>!v.prep)
+    .sort((a,b)=>a[1].n.localeCompare(b[1].n))
+    .map(([ik,v])=>`<option value="${ik}">${esc(v.n)}</option>`).join("");
+  openModal(`<div class="mhead"><h3>Afegir ingredient a ${esc(A[k].n)}</h3>
+    <button class="close" onclick="closeModal()">×</button></div><div class="mbody">
+    <select class="search" id="ai_k">${opcions}</select>
+    <div class="qrow"><span class="nm">Grams per cada 100 g de producte</span>
+      <input type="number" step="0.1" id="ai_g" value="10"></div>
+    <button class="btn" style="margin-top:12px" onclick="ferAfegirIngRecepta('${k}')">Afegir</button>
+    </div>`, true);
+}
+function ferAfegirIngRecepta(k){
+  const sk = $("#ai_k").value, g = +$("#ai_g").value||0;
+  if(!g) return alert("Posa una quantitat.");
+  const actual = ing(k);
+  const prep = Object.assign({}, actual.prep, {[sk]: g});
+  if(S.customIng[k]) S.customIng[k].prep = prep;
+  else S.editsIng[k] = Object.assign({}, S.editsIng[k], {prep, recepta:actual.recepta});
+  apuntarCanvi("Ha afegit "+(ing(sk)?ing(sk).n:sk)+" a la recepta «"+actual.n+"»");
+  tocarConfig(); closeModal(); render();
+}
+function desarRecepta(k){
+  const base = ING[k]; if(!base) return;
+  const prep = {};
+  for(const sk of Object.keys(base.prep||{})){
+    const el = document.getElementById("prep_"+k+"_"+sk);
+    if(el) prep[sk] = +el.value || 0;
+  }
+  S.editsIng[k] = Object.assign({}, S.editsIng[k], {
+    recepta: document.getElementById("rec_"+k).value.trim(), prep
+  });
+  apuntarCanvi("Ha modificat la recepta de «"+base.n+"»");
+  tocarConfig(); render();
+}
+function restaurarRecepta(k){
+  if(!confirm("Tornar la recepta a com venia?")) return;
+  delete S.editsIng[k];
+  apuntarCanvi("Ha restaurat la recepta original de «"+ING[k].n+"»");
+  tocarConfig(); render();
+}
+
+/* --- quantitats per ració --- */
+function seccioRacions(){
+  const R = racions();
+  let h = `<div class="card pad"><div class="small muted" style="margin-bottom:14px">
+    Aquesta és la peça central: una ració de cada grup. Tots els aliments d'un grup són
+    intercanviables entre ells, i quan ella adapta un àpat l'aplicatiu li proposa aquestes
+    quantitats. <b>Canviar un número aquí afecta tots els plats i tots els suggeriments alhora.</b>
+    Les quantitats marcades com a <i>deduïda</i> no surten literalment de les guies: les vaig
+    calcular per equivalència i són les primeres a revisar.</div>`;
+  for(const [grup, d] of Object.entries(R)){
+    h += `<div style="border:1px solid var(--linia);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div class="spread"><b style="font-size:15px">${esc(d.n)}</b>
+        <span class="row" style="gap:6px"><span class="xs muted">racions per àpat</span>
+        <input type="number" step="1" min="0" id="rac_per_${grup}" value="${d.perApat}"
+          style="width:58px;padding:4px 6px;border:1px solid var(--linia);border-radius:7px;text-align:right"></span>
+      </div>
+      <div class="xs muted" style="margin:3px 0 10px">${esc(d.ajuda||"")}</div>
+      <table>`;
+    for(const [k,a] of Object.entries(d.aliments)){
+      const nom = ing(k) ? ing(k).n : k;
+      const et = a.font==="editat" ? '<span class="tag blau">canviada</span>'
+               : a.font==="equivalent" ? '<span class="tag">deduïda</span>' : "";
+      h += `<tr><td>${esc(nom)} ${et}
+        ${a.nota?`<div class="xs muted">${esc(a.nota)}</div>`:""}</td>
+        <td style="width:120px;text-align:right">
+          <input type="number" step="5" min="1" id="rac_${grup}_${k}" value="${a.g}"
+            style="width:78px;padding:4px 6px;border:1px solid var(--linia);border-radius:7px;text-align:right">
+          <span class="xs muted">${ing(k)&&ing(k).ml?"ml":"g"}</span></td></tr>`;
+    }
+    h += `</table><div class="row" style="margin-top:11px">
+      <button class="btn sm" onclick="desarRacions('${grup}')">Desar ${esc(d.n.toLowerCase())}</button>
+      ${S.racions[grup]?`<button class="btn ghost sm" onclick="restaurarRacions('${grup}')">Tornar a l'original</button>`:""}
+      </div></div>`;
+  }
+  return h+`</div>`;
+}
+function desarRacions(grup){
+  const R = RACIONS_BASE[grup]; if(!R) return;
+  const canvis = {aliments:{}};
+  const per = document.getElementById("rac_per_"+grup);
+  if(per && +per.value !== R.perApat) canvis.perApat = +per.value;
+  const actual = racions()[grup];
+  for(const k of Object.keys(actual.aliments)){
+    const el = document.getElementById("rac_"+grup+"_"+k);
+    if(!el) continue;
+    const v = +el.value || 0;
+    const orig = R.aliments[k] ? R.aliments[k].g : null;
+    if(v>0 && v!==orig) canvis.aliments[k] = {g:v};
+  }
+  if(!Object.keys(canvis.aliments).length && canvis.perApat==null) delete S.racions[grup];
+  else S.racions[grup] = canvis;
+  apuntarCanvi("Ha canviat les quantitats del grup «"+R.n+"»");
+  tocarConfig(); render();
+}
+function restaurarRacions(grup){
+  if(!confirm("Tornar les quantitats d'aquest grup a com venien?")) return;
+  delete S.racions[grup];
+  apuntarCanvi("Ha restaurat les quantitats originals del grup «"+RACIONS_BASE[grup].n+"»");
+  tocarConfig(); render();
+}
+
+/* --- registre de canvis --- */
+function seccioCanvis(){
+  const c = S.canvis||[];
+  if(!c.length) return `<div class="card pad muted">Encara no s'ha modificat res.</div>`;
+  return `<div class="card pad"><div class="small muted" style="margin-bottom:10px">
+    Els ${c.length} últims canvis sobre plats, receptes i quantitats.</div><table>`+
+    c.map(x=>{
+      const d = new Date(x.quan);
+      return `<tr><td style="width:150px;white-space:nowrap" class="xs muted">
+        ${d.toLocaleDateString("ca-ES")} ${d.toLocaleTimeString("ca-ES",{hour:"2-digit",minute:"2-digit"})}</td>
+        <td style="width:200px" class="small">${esc(x.qui)}</td>
+        <td class="small">${esc(x.que)}</td></tr>`;
+    }).join("")+`</table></div>`;
 }
 
 /* =====================================================================
@@ -1059,8 +1469,14 @@ function viewRegistre(){
     h += `<tr><td style="white-space:nowrap"><b>${DIES[(dt.getDay()+6)%7]}</b>
       <div class="xs muted">${fmtDay(dt)} ${dt.getFullYear()}</div></td>
       <td class="small">`+MEALS.map(m=>{
-        const d = dishById(day.meals[m.id]);
-        return d?`<div><span class="muted xs">${m.n}:</span> ${esc(d.n)}</div>`:"";
+        const a = apatDelDia(day, m.id);
+        if(!a) return "";
+        const sens = day.sensacio && day.sensacio[m.id];
+        const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
+        return `<div><span class="muted xs">${m.n}:</span> ${esc(a.n)}
+          ${a.tipus==="fora"?'<span class="tag blau">fora</span>':""}
+          ${a.tipus==="lliure"?'<span class="tag">adaptat</span>':""}
+          ${sd?`<span class="dot" style="background:${sd.color}"></span>`:""}</div>`;
       }).join("")+`</td>
       <td class="xs muted">${day.habits.length}/${HABITS.length}</td>
       ${obert?`<td class="qty">${Math.round(sc.kcal)}</td><td class="qty">${Math.round(sc.prot)}</td>`:""}
@@ -1087,6 +1503,466 @@ function exportarRegistre(){
   }
   navigator.clipboard.writeText(txt).then(
     ()=>alert("Registre copiat al porta-retalls."), ()=>prompt("Copia el registre:", txt));
+}
+
+/* =====================================================================
+   SEGUIMENT — informe per a la nutricionista i la psicòloga
+   ---------------------------------------------------------------------
+   Descriu el que ha passat, no ho interpreta. Les conclusions les treuen
+   elles a la consulta.
+   ===================================================================== */
+let periode = "setmana";   // setmana | quatre | mes
+
+function diesDelPeriode(){
+  let ini, fi = addDays(monday(cursor), 6);
+  if(periode==="setmana") ini = monday(cursor);
+  else if(periode==="quatre"){ ini = addDays(monday(cursor), -21); }
+  else { const c = parseDay(iso(cursor)); ini = new Date(c.getFullYear(), c.getMonth(), 1);
+         fi = new Date(c.getFullYear(), c.getMonth()+1, 0); }
+  const out = [];
+  for(let d = new Date(ini); d <= fi; d = addDays(d,1)){
+    const ds = iso(d), w = S.weeks[weekKey(d)];
+    const day = w && w[ds];
+    if(day && apatsFets(day) > 0) out.push([ds, day]);
+  }
+  return {dies:out, ini, fi};
+}
+
+function analitzar(dies){
+  const r = {
+    nDies:dies.length, complets:0, validats:0, equilibrats:0, valorables:0,
+    apats:{total:0, programat:0, lliure:0, fora:0},
+    sensPerApat:{}, sensTotal:{v:0,t:0,r:0}, senseSens:0,
+    fora:[], adaptats:[], habits:{}, tria:{},
+  };
+  for(const m of MEALS) r.sensPerApat[m.id] = {v:0,t:0,r:0, total:0};
+  for(const h of HABITS) r.habits[h.id] = 0;
+
+  for(const [ds, day] of dies){
+    const chk = checkDay(day);
+    if(chk.fets === 5) r.complets++;
+    if(esValidat(day)) r.validats++;
+    if(chk.valorable){ r.valorables++; if(chk.complet) r.equilibrats++; }
+    for(const h of day.habits||[]) if(r.habits[h]!=null) r.habits[h]++;
+
+    for(const m of MEALS){
+      const a = apatDelDia(day, m.id);
+      if(!a) continue;
+      r.apats.total++;
+      r.apats[a.tipus==="plat" ? "programat" : a.tipus]++;
+      if(a.tipus==="fora") r.fora.push({ds, apat:m.n, lloc:a.lloc, text:a.n});
+      if(a.tipus==="lliure"){
+        r.adaptats.push({ds, apat:m.n, n:a.n});
+        for(const k of Object.keys(a.i)) r.tria[k] = (r.tria[k]||0)+1;
+      }
+      const s = day.sensacio && day.sensacio[m.id];
+      if(s){ r.sensPerApat[m.id][s]++; r.sensPerApat[m.id].total++; r.sensTotal[s]++; }
+      else r.senseSens++;
+    }
+  }
+  return r;
+}
+
+function viewSeguiment(){
+  const {dies, ini, fi} = diesDelPeriode();
+  const et = {setmana:"Setmana visible", quatre:"Últimes 4 setmanes", mes:"Mes sencer"};
+  let h = `<div class="sec-title"><h2>Seguiment</h2>
+    <span class="muted small">${fmtDay(ini)} – ${fmtDay(fi)} ${fi.getFullYear()}</span>
+    <span style="margin-left:auto" class="no-print">`+
+    Object.entries(et).map(([k,v])=>
+      `<button class="btn ${periode===k?"":"ghost"} sm" onclick="periode='${k}';render()">${v}</button>`).join(" ")+
+    ` <button class="btn ghost sm" onclick="window.print()">Imprimir o desar en PDF</button>
+      <button class="btn ghost sm" onclick="copiarSeguiment()">Copiar el text</button></span></div>`;
+
+  if(!dies.length) return h+`<div class="card pad muted">No hi ha cap dia amb menú en aquest període.</div>`;
+  const r = analitzar(dies);
+
+  /* --- seguiment de l'estructura --- */
+  h += `<div class="card pad" style="margin-bottom:14px">
+    <div class="macro">
+      <div><div class="v">${r.nDies}</div><div class="l">dies amb menú</div></div>
+      <div><div class="v">${r.complets}</div><div class="l">amb els 5 àpats</div></div>
+      <div><div class="v">${r.valorables?Math.round(r.equilibrats/r.valorables*100):0}%</div>
+           <div class="l">dies equilibrats</div></div>
+      <div><div class="v">${r.validats}</div><div class="l">dies validats</div></div>
+    </div>
+    <div class="small muted">Els dies amb algun àpat fora de casa (${r.apats.fora})
+      no compten al percentatge d'equilibri: no en coneixem les quantitats.</div>
+  </div>`;
+
+  /* --- d'on surten els àpats --- */
+  const pc = n => r.apats.total ? Math.round(n/r.apats.total*100) : 0;
+  h += `<div class="sec-title"><h2>Com s'han resolt els àpats</h2>
+    <span class="muted small">${r.apats.total} àpats en total</span></div>
+    <div class="card pad"><table>
+      <tr><td>Tal com estaven programats</td><td class="qty" style="text-align:right;width:110px">${r.apats.programat}</td>
+        <td class="qty" style="width:60px;text-align:right">${pc(r.apats.programat)}%</td></tr>
+      <tr><td>Adaptats per ella</td><td class="qty" style="text-align:right">${r.apats.lliure}</td>
+        <td class="qty" style="text-align:right">${pc(r.apats.lliure)}%</td></tr>
+      <tr><td>Fets fora de casa</td><td class="qty" style="text-align:right">${r.apats.fora}</td>
+        <td class="qty" style="text-align:right">${pc(r.apats.fora)}%</td></tr>
+    </table></div>`;
+
+  /* --- sensacions, desglossades per àpat --- */
+  const totalSens = r.sensTotal.v + r.sensTotal.t + r.sensTotal.r;
+  h += `<div class="sec-title"><h2>Com s'ha sentit en menjar</h2>
+    <span class="muted small">${totalSens} de ${r.apats.total} àpats anotats · deixar-ho en blanc és una opció</span></div>`;
+  if(!totalSens){
+    h += `<div class="card pad muted">Encara no ha anotat cap sensació en aquest període.</div>`;
+  } else {
+    h += `<div class="card pad"><table>
+      <tr><th>Àpat</th><th style="text-align:center">Bé</th><th style="text-align:center">Regular</th>
+          <th style="text-align:center">Malament</th><th style="width:180px"></th></tr>`;
+    for(const m of MEALS){
+      const s = r.sensPerApat[m.id];
+      if(!s.total) { h += `<tr><td>${m.n}</td><td colspan="4" class="xs muted">sense anotar</td></tr>`; continue; }
+      const w = x => (x/s.total*100).toFixed(0);
+      h += `<tr><td><b>${m.n}</b></td>
+        <td class="qty" style="text-align:center">${s.v||"·"}</td>
+        <td class="qty" style="text-align:center">${s.t||"·"}</td>
+        <td class="qty" style="text-align:center">${s.r||"·"}</td>
+        <td><div style="display:flex;height:9px;border-radius:99px;overflow:hidden;background:#eceadf">
+          ${s.v?`<span style="width:${w(s.v)}%;background:#57a247"></span>`:""}
+          ${s.t?`<span style="width:${w(s.t)}%;background:#d9a219"></span>`:""}
+          ${s.r?`<span style="width:${w(s.r)}%;background:#c0392b"></span>`:""}
+        </div></td></tr>`;
+    }
+    h += `</table>`;
+    const durs = MEALS.map(m=>({m, s:r.sensPerApat[m.id]}))
+      .filter(x=>x.s.total>=2)
+      .map(x=>({n:x.m.n, prop:(x.s.t+x.s.r)/x.s.total, t:x.s.total}))
+      .sort((a,b)=>b.prop-a.prop);
+    if(durs.length && durs[0].prop>0){
+      h += `<div class="small muted" style="margin-top:10px">L'àpat amb més anotacions en
+        taronja o vermell és <b>${esc(durs[0].n.toLowerCase())}</b>
+        (${Math.round(durs[0].prop*100)}% de ${durs[0].t} anotacions).</div>`;
+    }
+    h += `</div>`;
+  }
+
+  /* --- àpats fora de casa --- */
+  h += `<div class="sec-title"><h2>Àpats fora de casa</h2>
+    <span class="muted small">${r.fora.length}</span></div>`;
+  h += r.fora.length ? `<div class="card pad"><table>`+
+    r.fora.map(f=>`<tr><td style="width:110px;white-space:nowrap"><b>${DIES3[(parseDay(f.ds).getDay()+6)%7]}</b>
+      <span class="xs muted">${fmtDay(parseDay(f.ds))}</span></td>
+      <td style="width:80px" class="xs muted">${esc(f.apat)}</td>
+      <td>${f.lloc?`<span class="tag blau">${esc(f.lloc)}</span> `:""}${esc(f.text)}</td></tr>`).join("")+
+    `</table></div>`
+    : `<div class="card pad muted">Cap en aquest període.</div>`;
+
+  /* --- adaptacions --- */
+  h += `<div class="sec-title"><h2>Àpats que ha adaptat</h2>
+    <span class="muted small">${r.adaptats.length}</span></div>`;
+  if(r.adaptats.length){
+    const top = Object.entries(r.tria).sort((a,b)=>b[1]-a[1]).slice(0,10)
+      .filter(([k])=>ing(k));
+    h += `<div class="card pad"><table>`+
+      r.adaptats.map(a=>`<tr><td style="width:110px;white-space:nowrap"><b>${DIES3[(parseDay(a.ds).getDay()+6)%7]}</b>
+        <span class="xs muted">${fmtDay(parseDay(a.ds))}</span></td>
+        <td style="width:80px" class="xs muted">${esc(a.apat)}</td>
+        <td>${esc(a.n)}</td></tr>`).join("")+`</table>`;
+    if(top.length) h += `<div class="small muted" style="margin-top:10px">
+      Aliments que ha triat més sovint en adaptar: ${top.map(([k,n])=>esc(ing(k).n)+" ("+n+")").join(" · ")}.</div>`;
+    h += `</div>`;
+  } else h += `<div class="card pad muted">Cap en aquest període.</div>`;
+
+  /* --- hàbits --- */
+  h += `<div class="sec-title"><h2>Indicacions d'hàbits</h2></div><div class="card pad"><table>`+
+    HABITS.map(x=>{
+      const n = r.habits[x.id], p = r.nDies ? Math.round(n/r.nDies*100) : 0;
+      return `<tr><td>${esc(x.n)}</td>
+        <td class="qty" style="width:90px;text-align:right">${n} de ${r.nDies}</td>
+        <td style="width:150px"><div class="kbar"><span style="width:${p}%"></span></div></td></tr>`;
+    }).join("")+`</table></div>`;
+
+  /* --- dades numèriques, només amb accés --- */
+  if(obert){
+    let tk=0, tp=0, n=0;
+    for(const [ds, day] of dies){
+      if(!checkDay(day).valorable) continue;
+      const sc = scoreDayFull(day); tk += sc.kcal; tp += sc.prot; n++;
+    }
+    if(n){
+      h += `<div class="sec-title"><h2>Mitjanes del període</h2>
+        <span class="muted small">${n} dies sense àpats fora · només visible amb accés</span></div>
+        <div class="card pad">${macroBox({kcal:tk/n, p:tp/n, c:0, f:0})
+          .replace(/<div><div class="v">0<\/div><div class="l">hidrats g<\/div><\/div>\s*<div><div class="v">0<\/div><div class="l">greix g<\/div><\/div>/,
+            `<div><div class="v">${Math.round(r.apats.fora/Math.max(1,r.nDies)*7)}</div><div class="l">àpats fora / setmana</div></div>
+             <div><div class="v">${totalSens?Math.round((r.sensTotal.t+r.sensTotal.r)/totalSens*100):0}%</div>
+             <div class="l">anotacions taronja o vermell</div></div>`)}
+        <div class="small muted">Objectiu diari: ${targetActual().kcal} kcal i ${targetActual().prot} g de proteïna.</div>
+        </div>`;
+    }
+  }
+  return h;
+}
+
+function copiarSeguiment(){
+  const {dies, ini, fi} = diesDelPeriode();
+  if(!dies.length) return alert("No hi ha dades en aquest període.");
+  const r = analitzar(dies);
+  let t = "SEGUIMENT · "+fmtDay(ini)+" – "+fmtDay(fi)+" "+fi.getFullYear()+"\n\n";
+  t += "Dies amb menú: "+r.nDies+"   amb els 5 àpats: "+r.complets+"   validats: "+r.validats+"\n";
+  t += "Dies equilibrats: "+r.equilibrats+" de "+r.valorables+" valorables\n\n";
+  t += "ÀPATS ("+r.apats.total+")\n";
+  t += "  Tal com estaven programats: "+r.apats.programat+"\n";
+  t += "  Adaptats per ella: "+r.apats.lliure+"\n";
+  t += "  Fets fora de casa: "+r.apats.fora+"\n\n";
+  t += "SENSACIÓ EN MENJAR\n";
+  for(const m of MEALS){
+    const s = r.sensPerApat[m.id];
+    t += "  "+m.n.padEnd(10)+(s.total ? "bé "+s.v+" · regular "+s.t+" · malament "+s.r : "sense anotar")+"\n";
+  }
+  if(r.fora.length){
+    t += "\nÀPATS FORA DE CASA\n";
+    for(const f of r.fora) t += "  "+f.ds+" "+f.apat+(f.lloc?" ("+f.lloc+")":"")+": "+f.text+"\n";
+  }
+  if(r.adaptats.length){
+    t += "\nÀPATS ADAPTATS PER ELLA\n";
+    for(const a of r.adaptats) t += "  "+a.ds+" "+a.apat+": "+a.n+"\n";
+  }
+  t += "\nHÀBITS\n";
+  for(const x of HABITS) t += "  "+x.n.padEnd(42)+r.habits[x.id]+" de "+r.nDies+"\n";
+  navigator.clipboard.writeText(t).then(()=>alert("Informe copiat."), ()=>prompt("Copia l'informe:", t));
+}
+
+/* =====================================================================
+   TAULELL DE MISSATGES
+   ===================================================================== */
+function viewMissatges(){
+  const jo = quiSoc();
+  const msgs = (S.missatges||[]).slice().sort((a,b)=>b.quan.localeCompare(a.quan));
+  let h = `<div class="sec-title"><h2>Taulell de missatges</h2>
+    <span class="muted small">Entre tu, la nutricionista i la psicòloga · ella no hi té accés</span></div>`;
+
+  h += `<div class="card pad" style="margin-bottom:14px">
+    <textarea class="msgbox" id="msgNou" placeholder="Escriu un missatge…"></textarea>
+    <div id="adjuntAvis" class="xs muted" style="margin-top:7px"></div>
+    <div class="row" style="margin-top:9px;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <span class="xs muted">${jo ? "Signaràs com a "+esc(jo) : "Sense sessió: signarà com a «aquest aparell»"}</span>
+      <span class="row" style="gap:8px">
+        <label class="btn ghost sm" style="cursor:pointer">Adjuntar un fitxer
+          <input type="file" id="msgFitxer" accept=".pdf,.doc,.docx,image/*"
+            style="display:none" onchange="triarAdjunt(this)"></label>
+        <button class="btn" onclick="enviarMissatge()">Publicar</button>
+      </span>
+    </div>
+    <div class="xs muted" style="margin-top:7px">PDF, document o imatge, fins a 8 MB.
+      Cal tenir la sessió iniciada.</div></div>`;
+
+  if(!msgs.length) return h+`<div class="card pad muted">Encara no hi ha cap missatge.</div>`;
+
+  for(const m of msgs){
+    const d = new Date(m.quan);
+    const meu = jo && m.qui===jo;
+    const nou = jo && !meu && !(m.llegits||{})[jo];
+    const lectors = Object.keys(m.llegits||{});
+    h += `<div class="msg ${meu?"meu":""} ${nou?"nou":""}">
+      <div class="cap">
+        <span class="qui">${esc(m.qui)}${meu?' <span class="tag">tu</span>':""}
+          ${nou?'<span class="badge">nou</span>':""}</span>
+        <span class="quan">${d.toLocaleDateString("ca-ES",{day:"numeric",month:"short"})}
+          ${d.toLocaleTimeString("ca-ES",{hour:"2-digit",minute:"2-digit"})}</span>
+      </div>
+      <div class="txt">${esc(m.text)}</div>
+      ${m.doc ? `<div class="row" style="margin-top:10px;gap:8px;border:1px solid var(--linia);
+          border-radius:11px;padding:9px 12px;background:#fdfdfb">
+          <span style="font-size:17px">📄</span>
+          <span style="flex:1"><b class="small">${esc(m.doc.nom)}</b>
+            <div class="xs muted">${(m.doc.mida/1024).toFixed(0)} kB</div></span>
+          <button class="btn ghost sm" onclick='obrirAdjunt(${JSON.stringify(m.doc)})'>obrir</button>
+        </div>` : ""}
+      <div class="peu">
+        <span>${lectors.length
+          ? "Llegit per "+lectors.map(esc).join(", ")
+          : '<span style="color:var(--gris)">Encara no l\'ha llegit ningú</span>'}</span>
+        ${meu?`<button class="btn danger sm" onclick="treureMissatge('${m.id}')">esborrar</button>`:""}
+      </div></div>`;
+  }
+  return h;
+}
+
+let adjuntPendent = null;
+function triarAdjunt(inp){
+  const f = inp.files[0];
+  adjuntPendent = f || null;
+  $("#adjuntAvis").innerHTML = f
+    ? `📄 <b>${esc(f.name)}</b> (${(f.size/1024).toFixed(0)} kB) · s'enviarà amb el missatge
+       <button class="close" style="font-size:15px" onclick="adjuntPendent=null;this.parentNode.innerHTML=''">×</button>`
+    : "";
+}
+async function enviarMissatge(){
+  const t = $("#msgNou").value;
+  if(!t.trim() && !adjuntPendent) return;
+  let doc = null;
+  if(adjuntPendent){
+    try{
+      $("#adjuntAvis").textContent = "Enviant el fitxer…";
+      doc = await Sync.pujarDocument(adjuntPendent);
+      S.documents = S.documents || [];
+      S.documents.unshift(doc);
+    }catch(e){
+      $("#adjuntAvis").innerHTML = `<span style="color:var(--vermell)">${esc(e.message)}</span>`;
+      return;
+    }
+  }
+  const m = escriureMissatge(t.trim() || ("Adjunta: "+doc.nom));
+  if(m && doc) m.doc = doc;
+  adjuntPendent = null;
+  tocarConfig(); render();
+}
+async function obrirAdjunt(doc){
+  const blob = await Sync.baixarDocument(doc);
+  if(!blob) return alert("No s'ha pogut obtenir el fitxer. Comprova la connexió.");
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = doc.nom; a.target = "_blank";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+}
+function treureMissatge(id){
+  if(!confirm("Esborrar aquest missatge?")) return;
+  const m = (S.missatges||[]).find(x=>x.id===id);
+  if(m && m.doc){
+    Sync.esborrarDocument(m.doc).catch(()=>{});
+    S.documents = (S.documents||[]).filter(d=>d.id!==m.doc.id);
+  }
+  esborrarMissatge(id); tocarConfig(); render();
+}
+
+/* =====================================================================
+   PES
+   ===================================================================== */
+let pesRang = 90;   // dies enrere que es mostren
+function viewPes(){
+  const fins = TODAY, desde = addDays(TODAY, -pesRang);
+  const serie = seriePes(desde, fins);
+  const tot = seriePes();
+  let h = `<div class="sec-title"><h2>Pes</h2>
+    <span class="muted small">Registrat des de l'aplicatiu del mòbil · no apareix mai al d'ella</span>
+    <span style="margin-left:auto" class="no-print">`+
+    [[30,"30 dies"],[90,"3 mesos"],[365,"1 any"],[9999,"Tot"]].map(([d,n])=>
+      `<button class="btn ${pesRang===d?"":"ghost"} sm" onclick="pesRang=${d};render()">${n}</button>`).join(" ")+
+    ` <button class="btn ghost sm" onclick="editarPes('${iso(TODAY)}')">+ Afegir una pesada</button></span></div>`;
+
+  if(!tot.length) return h+`<div class="card pad muted">
+    Encara no hi ha cap pesada registrada. Pots afegir-ne una des d'aquí, o des de
+    l'aplicatiu del mòbil <b>pes.html</b>.</div>`;
+
+  /* --- gràfica de tendència --- */
+  h += `<div class="card pad" style="margin-bottom:14px">`;
+  h += serie.length>=2 ? grafPes(serie) : `<div class="muted small">Calen com a mínim dues pesades
+    en aquest període per dibuixar la tendència.</div>`;
+  h += `<div class="small muted" style="margin-top:10px">La línia és la <b>mitjana dels últims
+    7 dies</b>, no la pesada del dia. El pes oscil·la més d'un quilo per líquids, digestió o
+    cicle hormonal: mirar punts solts fa veure canvis que no hi són. Els punts grisos són les
+    pesades reals.</div></div>`;
+
+  /* --- diari: pesades i observacions, juntes --- */
+  const diari = diariComplet();
+  h += `<div class="sec-title"><h2>Diari</h2>
+    <span class="muted small">${diari.length} entrades · pesades i observacions</span>
+    <span style="margin-left:auto" class="no-print">
+      <button class="btn ghost sm" onclick="editarNota('${iso(TODAY)}')">+ Anotar un dia sense pesada</button>
+    </span></div>
+    <div class="card pad"><table>
+    <tr><th>Dia</th><th style="text-align:right">Pes</th><th>Condicions</th><th>Observacions</th><th></th></tr>`;
+  for(const p of diari.slice(0,150)){
+    const obs = [p.notaPes, p.text].filter(Boolean).join(" · ");
+    h += `<tr><td style="white-space:nowrap"><b>${DIES3[(p.d.getDay()+6)%7]}</b>
+        <span class="xs muted">${fmtDay(p.d)} ${p.d.getFullYear()}</span></td>
+      <td class="qty" style="text-align:right">${p.pes!=null ? p.pes.toFixed(1)+" kg"
+        : '<span class="muted xs">sense pesar</span>'}</td>
+      <td class="xs muted">${esc(p.hora||"")}</td>
+      <td class="small">${esc(obs)}</td>
+      <td style="width:190px;white-space:nowrap">
+        <button class="btn ghost sm" onclick="editarPes('${p.ds}')">pes</button>
+        <button class="btn ghost sm" onclick="editarNota('${p.ds}')">nota</button>
+        ${p.pes!=null?`<button class="btn danger sm" onclick="esborrarPes('${p.ds}')">×</button>`:""}
+      </td></tr>`;
+  }
+  return h+`</table></div>`;
+}
+
+function editarNota(ds){
+  openModal(`<div class="mhead"><div><h3>Observacions del dia</h3>
+      <div class="small muted">No cal que hi hagi pesada</div></div>
+    <button class="close" onclick="closeModal()">×</button></div><div class="mbody">
+    <div class="qrow"><span class="nm">Dia</span>
+      <input type="date" id="nd_ds" value="${ds}" style="padding:6px 8px;border:1px solid var(--linia);border-radius:8px"></div>
+    <textarea class="msgbox" id="nd_txt" style="min-height:130px;margin-top:8px"
+      placeholder="Com ha anat el dia, què has notat…">${esc(notaDia(ds))}</textarea>
+    <button class="btn" style="margin-top:12px" onclick="desarNotaForm()">Desar</button>
+    </div>`, true);
+  setTimeout(()=>{ const t=$("#nd_txt"); if(t) t.focus(); },40);
+}
+function desarNotaForm(){
+  const ds = $("#nd_ds").value;
+  if(!ds) return alert("Tria un dia.");
+  desarNotaDia(ds, $("#nd_txt").value);
+  tocarConfig(); closeModal(); render();
+}
+
+function grafPes(serie){
+  const t = tendenciaPes(serie, 7);
+  const W = 900, H = 230, mx = 46, my = 18;
+  const xs = t.map(p=>p.d.getTime());
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const vals = t.map(p=>p.mitjana).concat(t.map(p=>p.kg));
+  let v0 = Math.min(...vals), v1 = Math.max(...vals);
+  const marge = Math.max(0.6, (v1-v0)*0.25);
+  v0 -= marge; v1 += marge;
+  const X = v => mx + (x1===x0 ? (W-mx-12)/2 : (v-x0)/(x1-x0)*(W-mx-12));
+  const Y = v => my + (1-(v-v0)/(v1-v0))*(H-my*2);
+  const linia = t.map((p,i)=>(i?"L":"M")+X(p.d.getTime()).toFixed(1)+" "+Y(p.mitjana).toFixed(1)).join(" ");
+
+  let g = `<svg class="pesgraf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`;
+  for(let i=0;i<=4;i++){
+    const v = v0 + (v1-v0)*i/4, y = Y(v);
+    g += `<line class="eix" x1="${mx}" y1="${y.toFixed(1)}" x2="${W-12}" y2="${y.toFixed(1)}"/>
+          <text x="4" y="${(y+3).toFixed(1)}">${v.toFixed(1)}</text>`;
+  }
+  for(const p of t) g += `<circle class="punt" cx="${X(p.d.getTime()).toFixed(1)}"
+      cy="${Y(p.kg).toFixed(1)}" r="2.6"><title>${p.ds}: ${p.kg.toFixed(1)} kg</title></circle>`;
+  g += `<path class="tend" d="${linia}"/>`;
+  const marques = [t[0], t[Math.floor(t.length/2)], t[t.length-1]].filter(Boolean);
+  for(const p of marques)
+    g += `<text x="${X(p.d.getTime()).toFixed(1)}" y="${H-2}" text-anchor="middle">${fmtDay(p.d)}</text>`;
+  return g+`</svg>`;
+}
+
+function editarPes(ds){
+  const p = S.pesos[ds] || {};
+  openModal(`<div class="mhead"><div><h3>${p.kg?"Corregir la pesada":"Afegir una pesada"}</h3>
+      <div class="small muted">Es pot posar qualsevol dia, també enrere</div></div>
+    <button class="close" onclick="closeModal()">×</button></div><div class="mbody">
+    <div class="qrow"><span class="nm">Dia</span>
+      <input type="date" id="pe_ds" value="${ds}" style="padding:6px 8px;border:1px solid var(--linia);border-radius:8px"></div>
+    <div class="qrow"><span class="nm">Pes</span>
+      <input type="number" step="0.1" id="pe_kg" value="${p.kg||""}" placeholder="0,0"><span class="un">kg</span></div>
+    <div class="qrow"><span class="nm">Hora i condicions</span>
+      <input class="search" style="margin:0;width:190px" id="pe_hora" value="${esc(p.hora||"")}"
+        placeholder="matí, en dejú…"></div>
+    <div style="margin-top:10px"><div class="xs muted" style="margin-bottom:5px">Observació del dia (opcional)</div>
+      <textarea class="msgbox" id="pe_nota" style="min-height:80px">${esc(p.nota||"")}</textarea></div>
+    <div class="xs muted" style="margin-top:10px">Perquè dues pesades siguin comparables convé
+      fer-les sempre en condicions semblants: la mateixa hora, després del bany i amb roba
+      equivalent.</div>
+    <button class="btn" style="margin-top:14px" onclick="desarPesForm()">Desar</button>
+    </div>`, true);
+  setTimeout(()=>{ const k=$("#pe_kg"); if(k) k.focus(); },40);
+}
+function desarPesForm(){
+  const ds = $("#pe_ds").value;
+  if(!ds) return alert("Tria un dia.");
+  const ok = desarPes(ds, $("#pe_kg").value, {hora:$("#pe_hora").value, nota:$("#pe_nota").value});
+  if(!ok) return alert("El pes no és vàlid.");
+  tocarConfig(); closeModal(); render();
+}
+function esborrarPes(ds){
+  if(!confirm("Esborrar la pesada del "+ds+"?")) return;
+  treurePes(ds); tocarConfig(); render();
 }
 
 /* =====================================================================
@@ -1279,27 +2155,33 @@ function esborrarTot(){
    ===================================================================== */
 function tabsActuals(){
   const t = [
-    {id:"setmana",      n:"Setmana",             f:viewSetmana},
-    {id:"configurador", n:"Configurador",        f:viewConfigurador},
-    {id:"compra",       n:"Llista de la compra", f:viewCompra},
-    {id:"historial",    n:"Historial",           f:viewHistorial},
+    {id:"setmana",      n:"Setmana",      f:viewSetmana},
+    {id:"plats",        n:"Plats",        f:viewPlats},
+    {id:"configurador", n:"Configurador", f:viewConfigurador},
+    {id:"historial",    n:"Historial",    f:viewHistorial},
+    {id:"seguiment",    n:"Seguiment",    f:viewSeguiment},
   ];
   if(obert){
-    t.push({id:"registre", n:"Registre", f:viewRegistre});
+    t.push({id:"pes",      n:"Pes",         f:viewPes});
+    t.push({id:"registre", n:"Registre",    f:viewRegistre});
     t.push({id:"fotos",    n:"Fotografies", f:viewFotos});
   }
-  t.push({id:"guia", n:"Guia", f:viewGuia});
+  const sn = missatgesSenseLlegir();
+  t.push({id:"missatges", n:"Missatges"+(sn?" ("+sn+")":""), f:viewMissatges});
+  t.push({id:"guia",   n:"Guia", f:viewGuia});
+  t.push({id:"compra", n:"Llista de la compra", f:viewCompra});
   return t;
 }
 function render(){
+  pintarPorta();
   const T = tabsActuals();
   if(!T.some(x=>x.id===tab)) tab = "setmana";
+  /* en entrar al taulell, els missatges queden marcats com a llegits */
+  if(tab==="missatges" && marcarLlegits()) tocarConfig();
   $("#tabs").innerHTML = T.map(x=>
     `<button class="${tab===x.id?"on":""}" onclick="tab='${x.id}';render()">${x.n}</button>`).join("");
   $("#wlbl").textContent = fmtDay(cursor)+" – "+fmtDay(addDays(cursor,6))+
     (weekKey(cursor)===weekKey(TODAY)?" · actual":"");
-  $("#pany").classList.toggle("obert", obert);
-  $("#pany").title = obert ? "Accés obert · clica tres vegades per tancar-lo" : "";
   $("#view").innerHTML = (T.find(x=>x.id===tab)||T[0]).f();
 }
 $("#wprev").onclick  = ()=>{ cursor = addDays(cursor,-7); render(); };
@@ -1310,10 +2192,11 @@ function pintarSinc(e, canvis){
   const p = $("#estatSinc .p");
   p.className = "p"+(e.estat==="connectat" ? "" : e.estat==="error" ? " err" : " off");
   $("#estatTxt").textContent =
-    e.estat==="connectat" ? "sincronitzat" :
+    e.estat==="connectat" ? "sessió iniciada"+(e.email?" · "+e.email:"") :
     e.estat==="sense-sessio" ? "sessió no iniciada" :
-    e.estat==="carregant" ? "connectant…" : "només aquest aparell";
-  if(canvis) render();
+    e.estat==="carregant" ? "connectant…" :
+    e.estat==="error" ? "sense connexió" : "només aquest aparell";
+  render();
 }
 
 render();

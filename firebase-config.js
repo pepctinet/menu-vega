@@ -18,6 +18,14 @@ const FIREBASE_CONFIG = {
   appId:             "1:551327111753:web:d98f33e573c1f1e73fbd98"
 };
 
-/* Identificador del pla. Si algun dia vols portar més d'una persona,
-   fes servir un nom diferent per a cadascuna i duplica els aplicatius. */
-const PLA_ID = "principal";
+/* Identificador del pla dins de la base de dades.
+
+   ARA MATEIX: "proves". Tot el que registris aquests dies va a un
+   calaix separat i no embruta res.
+
+   EL DIA QUE HO POSEU OPERATIU cal canviar dues coses i tot arrenca
+   de zero a tots els aparells alhora, sense esborrar res a mà:
+     1. aquí:      PLA_ID  = "principal"
+     2. a core.js: const KEY = "menuvega_v3"   (ara és v2)
+   La primera buida el servidor; la segona, els aparells. */
+const PLA_ID = "proves";

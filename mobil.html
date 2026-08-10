@@ -7,19 +7,25 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.json">
-<title>Menú Vega</title>
+<link rel="apple-touch-icon" href="icona.svg">
+<title>Guia Nutricional</title>
 <!--
    APLICATIU DE MÒBIL
-   Aquest fitxer NO carrega nutri.js. No conté cap caloria, cap
-   macronutrient ni cap objectiu numèric: no hi són, ni al codi.
-   L'única valoració que mostra és l'etiqueta "Equilibrat", que es
-   calcula mirant si el plat té els elements que demana la guia.
+   ------------------------------------------------------------------
+   NO carrega nutri.js: no conté cap caloria ni cap macronutrient.
+
+   Principi que mana sobre tota la resta:
+   res del que es mesuri sobre ella es mostra a ella. Aquí no hi ha
+   recomptes, ni històrics, ni percentatges, ni ratxes, ni el pes.
+   Només: què toca ara, en quines quantitats, si l'àpat que té al
+   davant està complet o què hi pot afegir, i un lloc per dir com
+   s'ha sentit. La sensació és d'anada: es registra i desapareix.
 -->
 <style>
 :root{
   --verd:#4a7c3f; --verd-clar:#eaf2e5; --verd-fosc:#2f5226;
   --sorra:#f7f4ed; --paper:#fff; --text:#2c2c28; --gris:#8a8a80;
-  --linia:#e3dfd3; --r:16px;
+  --linia:#e3dfd3; --suau:#fdfdfb;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
 }
@@ -28,137 +34,147 @@ html,body{margin:0;padding:0}
 body{background:var(--sorra);color:var(--text);
  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
  font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;
- padding-bottom:calc(74px + var(--safe-b))}
+ padding-bottom:calc(28px + var(--safe-b))}
 button{font:inherit;border:none;background:none;color:inherit;cursor:pointer}
 h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em}
 
 /* ---------- capçalera ---------- */
-header{background:var(--verd);color:#fff;padding:calc(12px + var(--safe-t)) 16px 14px;
+header{background:var(--verd);color:#fff;padding:calc(14px + var(--safe-t)) 16px 16px;
  position:sticky;top:0;z-index:20}
-.hrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
-header h1{font-size:17px}
-header .sub{font-size:12.5px;opacity:.85;margin-top:1px}
-.navd{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.15);
- border-radius:99px;padding:3px}
-.navd button{width:32px;height:32px;border-radius:99px;font-size:17px;line-height:1;color:#fff}
-.avui-btn{background:rgba(255,255,255,.18);border-radius:99px;padding:5px 13px;
- font-size:12.5px;font-weight:600;color:#fff}
+.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+header h1{font-size:18px}
+header .data{font-size:13px;opacity:.88;margin-top:2px;text-transform:capitalize}
+.sinc{font-size:11px;opacity:.8;display:flex;align-items:center;gap:5px;margin-top:5px}
+.sinc .p{width:6px;height:6px;border-radius:99px;background:#a8d18c}
+.sinc .p.off{background:rgba(255,255,255,.45)}
+.sinc .p.err{background:#f0c05a}
+.hmenu{background:rgba(255,255,255,.16);border-radius:99px;width:38px;height:38px;
+ color:#fff;font-size:18px;flex:none;display:flex;align-items:center;justify-content:center}
 
-/* tira de dies */
-.strip{display:flex;gap:6px;margin-top:12px;overflow-x:auto;padding-bottom:2px;
- scrollbar-width:none}
-.strip::-webkit-scrollbar{display:none}
-.sd{flex:none;min-width:46px;text-align:center;padding:7px 4px;border-radius:12px;
- background:rgba(255,255,255,.13);color:#fff}
-.sd .d{font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
-.sd .n{font-size:16px;font-weight:700;line-height:1.2}
-.sd.on{background:#fff;color:var(--verd-fosc)}
-.sd.on .d{opacity:.7}
-.sd .pt{height:4px;width:4px;border-radius:99px;background:#fff;margin:3px auto 0;opacity:.55}
-.sd.on .pt{background:var(--verd)}
-.sd .pt.hide{opacity:0}
+/* ---------- resum del dia ---------- */
+.dia{margin:14px 16px 0;background:var(--paper);border:1px solid var(--linia);
+ border-radius:16px;padding:13px 15px}
+.dia .eq{display:inline-flex;align-items:center;gap:6px;background:var(--verd-clar);
+ color:var(--verd-fosc);border-radius:99px;padding:5px 13px;font-size:13.5px;font-weight:700}
+.dia .neutre{font-size:13.5px;color:var(--gris)}
+.habits{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.hb{border:1px solid var(--linia);border-radius:99px;padding:6px 12px;font-size:12.5px;
+ background:var(--suau)}
+.hb.on{background:var(--verd-clar);border-color:var(--verd);color:var(--verd-fosc);font-weight:600}
 
-/* ---------- contingut ---------- */
-main{padding:14px}
-.dtitle{font-size:13px;color:var(--gris);margin:2px 0 12px;text-transform:capitalize}
-.meal{background:var(--paper);border:1px solid var(--linia);border-radius:var(--r);
- margin-bottom:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+/* ---------- àpats ---------- */
+main{padding:14px 16px 0}
+.meal{background:var(--paper);border:1px solid var(--linia);border-radius:16px;
+ margin-bottom:12px;overflow:hidden}
 .meal.ara{border-color:var(--verd);box-shadow:0 0 0 3px var(--verd-clar)}
-.mh{padding:11px 14px 0;display:flex;align-items:center;gap:9px}
-.mh .hora{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+.mh{padding:12px 15px 0;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.hora{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
  color:var(--verd);background:var(--verd-clar);padding:3px 9px;border-radius:99px}
-.mh .ara-tag{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+.nomapat{font-size:12.5px;color:var(--gris);font-weight:600}
+.ara-tag{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
  color:#fff;background:var(--verd);padding:3px 9px;border-radius:99px}
-.mh .nom{font-size:12.5px;color:var(--gris);font-weight:600}
-.mb{padding:8px 14px 14px}
-.plat{font-size:17px;font-weight:700;line-height:1.3}
+.mb{padding:9px 15px 15px}
+.plat{font-size:17.5px;font-weight:700;line-height:1.3}
 .plat.buit{color:#b6b3a8;font-weight:500;font-style:italic;font-size:15px}
-.equil{display:inline-flex;align-items:center;gap:5px;margin-top:7px;
- background:var(--verd-clar);color:var(--verd-fosc);border-radius:99px;
- padding:4px 11px;font-size:12px;font-weight:700}
-.ings{margin-top:11px;border-top:1px solid #f1efe7;padding-top:9px}
-.ings div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:14.5px}
+.marca{display:inline-flex;align-items:center;gap:5px;border-radius:99px;
+ padding:4px 11px;font-size:12px;font-weight:700;margin-top:8px}
+.marca.ok{background:var(--verd-clar);color:var(--verd-fosc)}
+.marca.falta{background:#fdf3dc;color:#7d5f14}
+.marca.fora{background:#eef1f5;color:#4a5a6a}
+.ings{margin-top:12px;border-top:1px solid #f1efe7;padding-top:10px}
+.ings div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:15px}
 .ings .q{font-weight:700;white-space:nowrap;color:var(--verd-fosc);
  font-variant-numeric:tabular-nums}
 .ings .sub{font-size:11.5px;color:var(--gris)}
-.postr{margin-top:9px;font-size:13.5px;color:var(--gris)}
+.postr{margin-top:10px;font-size:13.5px;color:var(--gris)}
 .postr b{color:var(--text)}
-.macc{display:flex;gap:8px;margin-top:12px}
-.macc button{flex:1;padding:11px;border-radius:12px;font-size:13.5px;font-weight:600;
- border:1px solid var(--linia);background:#fdfdfb;display:flex;align-items:center;
- justify-content:center;gap:7px}
+.foratxt{margin-top:10px;font-size:15px;background:var(--suau);border:1px solid var(--linia);
+ border-radius:11px;padding:10px 12px;white-space:pre-wrap}
+.macc{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
+.macc button{flex:1;min-width:calc(50% - 4px);padding:11px 8px;border-radius:12px;
+ font-size:13.5px;font-weight:600;border:1px solid var(--linia);background:var(--suau);
+ display:flex;align-items:center;justify-content:center;gap:6px}
 .macc button:active{background:var(--verd-clar)}
-.macc .prim{background:var(--verd);color:#fff;border-color:var(--verd)}
+.icona{width:16px;height:16px;flex:none;vertical-align:-3px}
 .foto{margin-top:11px;border-radius:12px;overflow:hidden;position:relative;background:#eee}
 .foto img{width:100%;display:block}
 .foto .x{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;
  width:30px;height:30px;border-radius:99px;font-size:17px;line-height:1}
-.icona{width:17px;height:17px;flex:none;display:inline-block;vertical-align:-3px}
 
-/* ---------- resum del dia ---------- */
-.resum{background:var(--paper);border:1px solid var(--linia);border-radius:var(--r);
- padding:14px;margin-bottom:12px}
-.resum h3{font-size:14px;margin-bottom:8px}
-.resum .eq{display:inline-flex;align-items:center;gap:6px;background:var(--verd-clar);
- color:var(--verd-fosc);border-radius:99px;padding:5px 13px;font-size:13px;font-weight:700}
-.habits{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.hb{border:1px solid var(--linia);border-radius:99px;padding:6px 12px;font-size:12.5px;
- background:#fdfdfb}
-.hb.on{background:var(--verd-clar);border-color:var(--verd);color:var(--verd-fosc);font-weight:600}
-
-/* ---------- barra inferior ---------- */
-nav.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);
- border-top:1px solid var(--linia);display:flex;z-index:30;
- padding-bottom:var(--safe-b);backdrop-filter:blur(10px)}
-nav.bar button{flex:1;padding:9px 4px 8px;font-size:10.5px;color:var(--gris);
- display:flex;flex-direction:column;align-items:center;gap:3px;font-weight:600}
-nav.bar button.on{color:var(--verd)}
-nav.bar svg{width:22px;height:22px}
+/* ---------- sensació ---------- */
+.sens{margin-top:13px;border-top:1px solid #f1efe7;padding-top:11px}
+.sens .t{font-size:12.5px;color:var(--gris);margin-bottom:8px}
+.sensbtns{display:flex;gap:8px}
+.sb{flex:1;padding:9px;border-radius:12px;border:1px solid var(--linia);background:var(--suau);
+ display:flex;align-items:center;justify-content:center}
+.sb .b{width:19px;height:19px;border-radius:99px}
+.sb.on{border-width:2px;padding:8px}
 
 /* ---------- full lliscant ---------- */
-.sheet-ov{position:fixed;inset:0;background:rgba(30,30,26,.4);z-index:40;display:none}
-.sheet-ov.on{display:block}
-.sheet{position:fixed;left:0;right:0;bottom:0;max-height:88vh;background:var(--paper);
+.ov{position:fixed;inset:0;background:rgba(30,30,26,.42);z-index:40;display:none}
+.ov.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:90vh;background:var(--paper);
  border-radius:20px 20px 0 0;z-index:41;transform:translateY(100%);
  transition:transform .24s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;
  padding-bottom:var(--safe-b)}
 .sheet.on{transform:translateY(0)}
-.sh{padding:14px 16px 10px;border-bottom:1px solid var(--linia);flex:none}
-.sh .grip{width:38px;height:4px;background:#dcd8cc;border-radius:99px;margin:0 auto 11px}
-.sb{overflow-y:auto;padding:10px 16px 20px;-webkit-overflow-scrolling:touch}
-.opt{border:1px solid var(--linia);border-radius:14px;padding:13px 14px;margin-bottom:8px;
+.sh{padding:13px 16px 0;flex:none}
+.grip{width:38px;height:4px;background:#dcd8cc;border-radius:99px;margin:0 auto 12px}
+.shtit{display:flex;justify-content:space-between;align-items:baseline}
+.shtit h2{font-size:17px}
+.tabs{display:flex;gap:6px;margin:12px 0 0;border-bottom:1px solid var(--linia)}
+.tabs button{flex:1;padding:10px 6px;font-size:13.5px;font-weight:600;color:var(--gris);
+ border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--verd-fosc);border-bottom-color:var(--verd)}
+.sb2{overflow-y:auto;padding:12px 16px 22px;-webkit-overflow-scrolling:touch;flex:1}
+.opt{border:1px solid var(--linia);border-radius:14px;padding:12px 14px;margin-bottom:8px;
  background:#fff}
 .opt:active{background:var(--verd-clar)}
 .opt.sel{border-color:var(--verd);background:var(--verd-clar)}
 .opt .t{font-weight:700;font-size:15.5px}
-.opt .s{font-size:12.5px;color:var(--gris);margin-top:3px;line-height:1.4}
+.opt .s{font-size:12.5px;color:var(--gris);margin-top:3px;line-height:1.45}
+.opt .q{font-weight:700;color:var(--verd-fosc);font-size:14px;white-space:nowrap}
+.optrow{display:flex;justify-content:space-between;gap:12px;align-items:center}
 .cerca{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
- font-size:16px;background:#fdfdfb;margin-bottom:10px}
-
-/* ---------- setmana ---------- */
-.wk{background:var(--paper);border:1px solid var(--linia);border-radius:var(--r);
- padding:12px 14px;margin-bottom:9px}
-.wk.avui{border-color:var(--verd);box-shadow:0 0 0 3px var(--verd-clar)}
-.wk h3{font-size:14px;text-transform:capitalize}
-.wk .li{display:flex;gap:9px;padding:5px 0;font-size:13.5px;align-items:baseline}
-.wk .li span:first-child{color:var(--gris);font-size:11px;width:56px;flex:none;
- text-transform:uppercase;letter-spacing:.04em;font-weight:700}
-
-/* ---------- estat / avisos ---------- */
-.avis{background:#fdf3dc;border:1px solid #f0e2bb;color:#7d5f14;border-radius:12px;
- padding:11px 13px;font-size:13px;margin-bottom:12px}
-.sinc{font-size:11px;opacity:.85;display:flex;align-items:center;gap:5px}
-.sinc .p{width:6px;height:6px;border-radius:99px;background:#9ec78e}
-.sinc .p.off{background:#d8d4c6}
-.sinc .p.err{background:#e0a24a}
-.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
- font-size:16px;margin-bottom:9px;background:#fdfdfb}
-.btn{background:var(--verd);color:#fff;padding:13px;border-radius:12px;font-weight:700;
- width:100%;font-size:15px}
+ font-size:16px;background:var(--suau);margin-bottom:12px}
+textarea.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
+ font-size:16px;background:var(--suau);min-height:110px;resize:vertical;font-family:inherit}
+.btn{background:var(--verd);color:#fff;padding:14px;border-radius:13px;font-weight:700;
+ width:100%;font-size:15.5px}
 .btn.g{background:#fff;color:var(--verd-fosc);border:1px solid var(--linia)}
-.buit{text-align:center;color:var(--gris);padding:36px 20px;font-size:14.5px}
-.validat{background:var(--verd-clar);border:1px solid #cfe0c5;color:var(--verd-fosc);
- border-radius:12px;padding:10px 13px;font-size:13px;margin-bottom:12px;font-weight:600}
+.btn:disabled{opacity:.4}
+.plantilles{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.pl{border:1px solid var(--linia);border-radius:99px;padding:7px 13px;font-size:13px;
+ background:var(--suau)}
+.pl:active{background:var(--verd-clar)}
+
+/* constructor per grups */
+.grup{border:1px solid var(--linia);border-radius:14px;margin-bottom:10px;overflow:hidden}
+.grup .gh{padding:11px 14px;background:var(--suau);display:flex;justify-content:space-between;
+ align-items:center;gap:10px}
+.grup .gh .gn{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+ color:var(--verd-fosc)}
+.grup .gh .gr{font-size:11.5px;color:var(--gris)}
+.tria{padding:10px 14px;border-top:1px solid var(--linia);display:flex;
+ justify-content:space-between;align-items:center;gap:10px}
+.tria .nm{font-size:15px}
+.tria .qq{font-weight:700;color:var(--verd-fosc);white-space:nowrap;font-size:14px}
+.tria.buida .nm{color:#b6b3a8;font-style:italic;font-size:14px}
+.afegir{padding:10px 14px;border-top:1px solid var(--linia);color:var(--verd-fosc);
+ font-weight:600;font-size:13.5px}
+.resum-cons{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--linia);
+ padding:12px 16px calc(12px + var(--safe-b));margin:0 -16px -22px}
+.buit{text-align:center;color:var(--gris);padding:40px 22px;font-size:14.5px;line-height:1.6}
+.validat{margin:14px 16px 0;background:var(--verd-clar);border:1px solid #cfe0c5;
+ color:var(--verd-fosc);border-radius:13px;padding:11px 14px;font-size:13.5px;font-weight:600}
+.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-radius:12px;
+ font-size:16px;margin-bottom:9px;background:var(--suau)}
+.blocmes{background:var(--paper);border:1px solid var(--linia);border-radius:14px;
+ padding:13px 15px;margin-bottom:10px}
+.blocmes h3{font-size:14px;margin-bottom:7px}
+.li{display:flex;gap:9px;padding:5px 0;font-size:14px;align-items:baseline}
+.li span:first-child{color:var(--gris);font-size:11px;width:58px;flex:none;
+ text-transform:uppercase;letter-spacing:.04em;font-weight:700}
 </style>
 </head>
 <body>
@@ -166,33 +182,21 @@ nav.bar svg{width:22px;height:22px}
 <header>
   <div class="hrow">
     <div>
-      <h1>Menú Vega</h1>
-      <div class="sinc" id="sinc"><span class="p off"></span><span id="sincTxt">Carregant…</span></div>
+      <h1>Guia Nutricional</h1>
+      <div class="data" id="data">—</div>
+      <div class="sinc" id="sinc"><span class="p off"></span><span id="sincTxt">…</span></div>
     </div>
-    <button class="avui-btn" id="btnAvui">Avui</button>
+    <button class="hmenu" id="btnMes" aria-label="Més">☰</button>
   </div>
-  <div class="strip" id="strip"></div>
 </header>
 
-<main id="vista"></main>
+<div id="vista"></div>
 
-<nav class="bar">
-  <button id="tabDia" class="on">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-    Avui</button>
-  <button id="tabSetmana">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-    Setmana</button>
-  <button id="tabCompra">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16l-1.4 11.2a2 2 0 0 1-2 1.8H7.4a2 2 0 0 1-2-1.8Z"/><path d="M9 6V4.5A2.5 2.5 0 0 1 11.5 2h1A2.5 2.5 0 0 1 15 4.5V6"/></svg>
-    Compra</button>
-  <button id="tabMes">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    Més</button>
-</nav>
-
-<div class="sheet-ov" id="shov"></div>
-<div class="sheet" id="sheet"><div class="sh" id="shHead"></div><div class="sb" id="shBody"></div></div>
+<div class="ov" id="ov"></div>
+<div class="sheet" id="sheet">
+  <div class="sh" id="shHead"></div>
+  <div class="sb2" id="shBody"></div>
+</div>
 
 <input type="file" accept="image/*" capture="environment" id="camera" style="display:none">
 
@@ -201,106 +205,92 @@ nav.bar svg{width:22px;height:22px}
 <script src="sync.js"></script>
 <script>
 /* =====================================================================
-   APLICATIU DE MÒBIL
-   Sense calories, sense macronutrients, sense semàfor.
-   Única valoració visible: l'etiqueta "Equilibrat".
+   APLICATIU DE MÒBIL · només el dia en curs
    ===================================================================== */
 
-let diaSel = iso(TODAY);
-let vista  = "dia";
+let DS = iso(TODAY);        // sempre avui
 let camCtx = null;
 
-/* Si algun aliment personalitzat arriba del servidor amb valors
-   nutricionals, els descartem aquí: en aquest aplicatiu no hi pinten res. */
+/* Si arriben del servidor valors nutricionals en aliments personalitzats
+   o objectius numèrics, els descartem: aquí no hi pinten res. */
 function netejarNutri(){
-  let net = false;
-  for(const k of Object.keys(S.customIng||{})){
-    if(S.customIng[k] && S.customIng[k].nutri){ delete S.customIng[k].nutri; net = true; }
-  }
-  if(S.target){ S.target = null; net = true; }
-  return net;
+  for(const k of Object.keys(S.customIng||{}))
+    if(S.customIng[k] && S.customIng[k].nutri) delete S.customIng[k].nutri;
+  if(S.target) S.target = null;
 }
 netejarNutri();
 
-/* ---------- icones ---------- */
 const IC = {
   camera:'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.1-2h8.4l1.1 2h2.2A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z"/><circle cx="12" cy="13" r="3.2"/></svg>',
   canvi :'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
-  check :'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/></svg>',
+  fora  :'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/></svg>',
+  check :'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/></svg>',
 };
 
-/* ---------- ajudants ---------- */
 function apatActual(){
   const ara = new Date().getHours()*60 + new Date().getMinutes();
-  const talls = [[0,"esmorzar"],[9*60+30,"migmati"],[12*60,"dinar"],
-                 [15*60+30,"berenar"],[19*60,"sopar"]];
+  const talls = [[0,"esmorzar"],[9*60+30,"migmati"],[12*60,"dinar"],[15*60+30,"berenar"],[19*60,"sopar"]];
   let r = "esmorzar";
   for(const [t,id] of talls) if(ara>=t) r=id;
   return r;
 }
-const esAvui = () => diaSel===iso(TODAY);
-
-/* ---------- tira de dies ---------- */
-function pintarStrip(){
-  const mon = monday(parseDay(diaSel));
-  let h = "";
-  for(let i=0;i<7;i++){
-    const dt = addDays(mon,i), ds = iso(dt);
-    const day = dayData(ds);
-    const teMenu = Object.keys(day.meals).length>0;
-    h += `<button class="sd ${ds===diaSel?"on":""}" data-d="${ds}">
-      <div class="d">${DIES3[i]}</div><div class="n">${dt.getDate()}</div>
-      <div class="pt ${teMenu?"":"hide"}"></div></button>`;
-  }
-  $("#strip").innerHTML = h;
-  $$("#strip .sd").forEach(b=>b.onclick=()=>{ diaSel=b.dataset.d; pintar(); });
-  const on = $("#strip .sd.on"); if(on) on.scrollIntoView({inline:"center",block:"nearest"});
-}
 
 /* =====================================================================
-   VISTA: DIA
+   VISTA PRINCIPAL — el dia i prou
    ===================================================================== */
-function vistaDia(){
-  const day = dayData(diaSel);
-  const dt  = parseDay(diaSel);
-  const ara = esAvui() ? apatActual() : null;
+function pintar(){
+  const day = dayData(DS);
+  const dt  = parseDay(DS);
+  const ara = apatActual();
   const chk = checkDay(day);
 
-  let h = `<div class="dtitle">${esc(fmtLong(dt))}${esAvui()?" · avui":""}</div>`;
+  document.getElementById("data").textContent = fmtLong(dt);
 
+  let h = "";
   if(esValidat(day))
-    h += `<div class="validat">${IC.check} Dia tancat i desat al registre</div>`;
+    h += `<div class="validat">${IC.check} Dia tancat</div>`;
 
-  if(!Object.keys(day.meals).length){
-    h += `<div class="buit">Encara no hi ha res planificat per aquest dia.<br>
-          Es programa des de l'ordinador.</div>`;
-    return h;
-  }
+  /* Resum del dia: "Equilibrat" si ho està. Si no, res de res. */
+  h += `<div class="dia">`;
+  if(chk.complet) h += `<span class="eq">${IC.check} Equilibrat</span>`;
+  else h += `<div class="neutre">El dia d'avui</div>`;
+  h += pintarHabits(day) + `</div>`;
 
-  if(chk.complet)
-    h += `<div class="resum"><h3>El dia</h3>
-      <span class="eq">${IC.check} Equilibrat</span>
-      ${pintarHabits(day)}</div>`;
-  else
-    h += `<div class="resum"><h3>El dia</h3>${pintarHabits(day)}</div>`;
-
+  h += `<main>`;
+  let algun = false;
   for(const m of MEALS){
-    const d = dishById(day.meals[m.id]);
-    const c = d ? checkMeal(d.id, m.id) : null;
+    const a = apatDelDia(day, m.id);
+    if(a) algun = true;
+    const bloc = esValidat(day);
     const teFoto = !!(day.fotos && day.fotos[m.id]);
     h += `<div class="meal ${ara===m.id?"ara":""}" id="meal-${m.id}">
       <div class="mh">
         <span class="hora">${m.h}</span>
-        <span class="nom">${m.n}</span>
+        <span class="nomapat">${m.n}</span>
         ${ara===m.id?'<span class="ara-tag">ara</span>':""}
       </div>
-      <div class="mb">
-        <div class="plat ${d?"":"buit"}">${d?esc(d.n):"Sense triar"}</div>
-        ${c&&c.complet?`<div class="equil">${IC.check} Equilibrat</div>`:""}`;
-    if(d){
-      h += `<div class="ings">`+Object.entries(d.i).map(([k,g])=>{
-        const x = ing(k);
-        return `<div><span>${esc(x?x.n:k)}${x&&x.nota?` <span class="sub">(${esc(x.nota)})</span>`:""}</span>
+      <div class="mb">`;
+
+    if(!a){
+      h += `<div class="plat buit">Sense triar</div>`;
+    } else if(a.tipus==="fora"){
+      h += `<div class="plat">Àpat fora de casa</div>
+        <span class="marca fora">${a.lloc||"Fora"}</span>
+        <div class="foratxt">${esc(a.n)}</div>`;
+    } else {
+      const f = faltaApat(a.i, m.id);
+      h += `<div class="plat">${esc(a.n)}</div>`;
+      if(m.id==="dinar"||m.id==="sopar"){
+        h += f.complet
+          ? `<span class="marca ok">${IC.check} Equilibrat</span>`
+          : `<span class="marca falta">Hi falta ${f.falten.map(x=>x.t).join(" i ")}</span>`;
+      } else {
+        const c = checkMeal(a.id||"", m.id);
+        if(a.tipus==="plat" && c.complet) h += `<span class="marca ok">${IC.check} Equilibrat</span>`;
+      }
+      h += `<div class="ings">`+Object.entries(a.i).map(([k,g])=>{
+        const x = ing(k); if(!x) return "";
+        return `<div><span>${esc(x.n)}${x.nota?` <span class="sub">(${esc(x.nota)})</span>`:""}</span>
           <span class="q">${esc(qtyTxt(k,g))}</span></div>`;
       }).join("")+`</div>`;
       if(m.id==="dinar"||m.id==="sopar"){
@@ -308,305 +298,399 @@ function vistaDia(){
         if(p) h += `<div class="postr">Postres: <b>${esc(p.n)}</b></div>`;
       }
     }
-    h += `<div class="macc">
-        <button onclick="ferFoto('${m.id}')">${IC.camera} ${teFoto?"Refer la foto":"Foto del plat"}</button>
-        ${esValidat(day)?"":`<button onclick="canviarPlat('${m.id}')">${IC.canvi} Canviar</button>`}
-      </div>
-      <div id="foto-${m.id}"></div>
-    </div></div>`;
+
+    if(!bloc){
+      h += `<div class="macc">
+        <button onclick="obrirCanvi('${m.id}')">${IC.canvi} ${a?"Canviar":"Triar"}</button>
+        <button onclick="obrirFora('${m.id}')">${IC.fora} Menjo fora</button>
+        <button onclick="ferFoto('${m.id}')">${IC.camera} ${teFoto?"Refer la foto":"Foto"}</button>
+      </div>`;
+    } else {
+      h += `<div class="macc"><button onclick="ferFoto('${m.id}')">${IC.camera} ${teFoto?"Refer la foto":"Foto"}</button></div>`;
+    }
+    h += `<div id="foto-${m.id}"></div>`;
+
+    if(a) h += pintarSensacio(day, m.id);
+    h += `</div></div>`;
   }
-  return h;
+  h += `</main>`;
+
+  if(!algun){
+    h = (esValidat(day)?`<div class="validat">${IC.check} Dia tancat</div>`:"")+
+      `<div class="buit">Encara no hi ha res per avui.<br>Es programa des de l'ordinador,
+       o pots triar tu mateixa cada àpat.</div><main>`+
+      MEALS.map(m=>`<div class="meal"><div class="mh"><span class="hora">${m.h}</span>
+        <span class="nomapat">${m.n}</span></div><div class="mb">
+        <div class="plat buit">Sense triar</div>
+        <div class="macc"><button onclick="obrirCanvi('${m.id}')">${IC.canvi} Triar</button>
+        <button onclick="obrirFora('${m.id}')">${IC.fora} Menjo fora</button></div>
+        </div></div>`).join("")+`</main>`;
+  }
+
+  document.getElementById("vista").innerHTML = h;
+  mostrarFotos();
 }
+
 function pintarHabits(day){
   return `<div class="habits">`+HABITS.map(x=>
     `<button class="hb ${day.habits.includes(x.id)?"on":""}" onclick="ferHabit('${x.id}')">
       ${day.habits.includes(x.id)?"✓ ":""}${esc(x.n)}</button>`).join("")+`</div>`;
 }
 function ferHabit(id){
-  const day = dayData(diaSel);
+  const day = dayData(DS);
   if(esValidat(day)) return;
   const i = day.habits.indexOf(id);
   if(i<0) day.habits.push(id); else day.habits.splice(i,1);
-  tocarDia(diaSel); pintar();
+  tocarDia(DS); pintar();
 }
 
-/* ---------- fotografies ---------- */
-async function mostrarFotos(){
-  const day = dayData(diaSel);
-  for(const m of MEALS){
-    const cont = document.getElementById("foto-"+m.id);
-    if(!cont) continue;
-    if(!day.fotos || !day.fotos[m.id]){ cont.innerHTML=""; continue; }
-    const blob = await Sync.baixarFoto(diaSel, m.id);
-    if(!blob){ cont.innerHTML = `<div class="postr" style="margin-top:9px">Foto desada</div>`; continue; }
-    const url = URL.createObjectURL(blob);
-    cont.innerHTML = `<div class="foto"><img src="${url}" alt="Foto de l'àpat">
-      <button class="x" onclick="treureFoto('${m.id}')">×</button></div>`;
-  }
+/* --- sensació: d'anada. Es registra i no se'n mostra cap històric --- */
+function pintarSensacio(day, mealId){
+  const s = day.sensacio[mealId];
+  return `<div class="sens"><div class="t">Com t'has sentit? (pots deixar-ho en blanc)</div>
+    <div class="sensbtns">`+SENSACIONS.map(x=>
+      `<button class="sb ${s===x.id?"on":""}" style="${s===x.id?"border-color:"+x.color:""}"
+        onclick="marcarSensacio('${mealId}','${x.id}')" aria-label="${x.n}">
+        <span class="b" style="background:${x.color}"></span></button>`).join("")+
+    `</div></div>`;
 }
-function ferFoto(mealId){ camCtx = mealId; $("#camera").click(); }
-$("#camera").addEventListener("change", async e => {
-  const f = e.target.files[0];
-  e.target.value = "";
-  if(!f || !camCtx) return;
-  const meal = camCtx; camCtx = null;
-  try{
-    const blob = await Fotos.comprimir(f);
-    await Fotos.desar(diaSel, meal, blob);
-    const day = dayData(diaSel);
-    day.fotos[meal] = {u:Date.now(), mida:blob.size};
-    tocarDia(diaSel);
-    pintar();
-    Sync.pujarFoto(diaSel, meal, blob).catch(e=>console.warn("pujada:", e));
-  }catch(err){ alert("No s'ha pogut desar la foto: "+err.message); }
-});
-async function treureFoto(mealId){
-  if(!confirm("Vols esborrar aquesta foto?")) return;
-  await Sync.esborrarFoto(diaSel, mealId);
-  const day = dayData(diaSel);
-  delete day.fotos[mealId];
-  tocarDia(diaSel); pintar();
-}
-
-/* ---------- canviar el plat d'un àpat ---------- */
-function canviarPlat(mealId){
-  const m = MEALS.find(x=>x.id===mealId);
-  const day = dayData(diaSel);
-  const cur = day.meals[mealId];
-  obrirFull(`<div class="grip"></div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <h2 style="font-size:17px">${m.n}</h2>
-        <span style="font-size:12.5px;color:var(--gris)">${m.h}</span></div>
-      <div style="font-size:12.5px;color:var(--gris);margin-top:2px">
-        Tria una altra opció per avui</div>`,
-    llistaPlats(mealId, cur));
-  setTimeout(()=>{
-    const c = document.getElementById("cercaPlat");
-    if(c) c.oninput = () => {
-      $("#shBody").innerHTML = llistaPlats(mealId, cur, c.value);
-      const c2 = document.getElementById("cercaPlat");
-      if(c2){ c2.value = c.value; c2.oninput = c.oninput; }
-    };
-  },50);
-}
-function llistaPlats(mealId, cur, q){
-  q = (q||"").toLowerCase().trim();
-  let list = DISHES().filter(d=>d.m.includes(mealId));
-  if(q) list = list.filter(d=>d.n.toLowerCase().includes(q) ||
-      Object.keys(d.i).some(k=>ing(k) && ing(k).n.toLowerCase().includes(q)));
-  return `<input class="cerca" id="cercaPlat" placeholder="Cercar…" value="${esc(q)}">`+
-    (list.length ? list.map(d=>{
-      const c = checkMeal(d.id, mealId);
-      return `<div class="opt ${cur===d.id?"sel":""}" onclick="triarPlat('${mealId}','${d.id}')">
-        <div class="t">${esc(d.n)}${c.complet?' <span style="color:var(--verd);font-size:12px">· equilibrat</span>':""}</div>
-        <div class="s">${esc(ingListShort(d.i,5))}</div></div>`;
-    }).join("") : `<div class="buit">Cap opció amb aquest nom.</div>`);
-}
-function triarPlat(mealId, dishId){
-  const day = dayData(diaSel);
-  day.meals[mealId] = dishId;
-  if((mealId==="dinar"||mealId==="sopar") && !day.postres[mealId]){
-    const altre = mealId==="dinar" ? "sopar" : "dinar";
-    day.postres[mealId] = day.postres[altre]==="p_iogurt" ? "p_fruita_poma" : "p_iogurt";
-  }
-  tocarDia(diaSel); tancarFull(); pintar();
-  setTimeout(()=>{
-    const el = document.getElementById("meal-"+mealId);
-    if(el) el.scrollIntoView({behavior:"smooth", block:"center"});
-  },80);
-}
-
-/* =====================================================================
-   VISTA: SETMANA
-   ===================================================================== */
-function vistaSetmana(){
-  const mon = monday(parseDay(diaSel));
-  let h = `<div class="dtitle">Setmana del ${fmtDay(mon)} al ${fmtDay(addDays(mon,6))}</div>`;
-  let buida = true;
-  for(let i=0;i<7;i++){
-    const dt = addDays(mon,i), ds = iso(dt), day = dayData(ds);
-    if(!Object.keys(day.meals).length) continue;
-    buida = false;
-    const chk = checkDay(day);
-    h += `<div class="wk ${ds===iso(TODAY)?"avui":""}">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h3>${DIES[i]} ${dt.getDate()}</h3>
-        ${chk.complet?`<span class="equil" style="margin:0">${IC.check} Equilibrat</span>`:""}
-      </div>`;
-    for(const m of MEALS){
-      const d = dishById(day.meals[m.id]);
-      h += `<div class="li"><span>${m.n}</span><span>${d?esc(d.n):"—"}</span></div>`;
-    }
-    h += `<button class="btn g" style="margin-top:9px;padding:9px"
-      onclick="diaSel='${ds}';vista='dia';pintar()">Obrir el dia</button></div>`;
-  }
-  if(buida) h += `<div class="buit">Aquesta setmana encara no està programada.</div>`;
-  return h;
-}
-
-/* =====================================================================
-   VISTA: COMPRA
-   ===================================================================== */
-function vistaCompra(){
-  const mon = monday(parseDay(diaSel));
-  const {out, preps} = compraDe(mon, true);
-  const {sec, claus} = agruparCompra(out);
-  let h = `<div class="dtitle">Del que queda de setmana</div>`;
-  if(!claus.length) return h+`<div class="buit">No hi ha res a comprar: la setmana no està programada.</div>`;
-  for(const k of claus){
-    h += `<div class="wk"><h3 style="text-transform:uppercase;font-size:11.5px;
-      letter-spacing:.06em;color:var(--verd-fosc)">${esc(k)}</h3>`;
-    for(const [ik,g] of sec[k]){
-      const tinc = !!S.pantry[ik];
-      h += `<div class="li" style="${tinc?"opacity:.4;text-decoration:line-through":""}"
-        onclick="marcarCompra('${ik}')">
-        <span style="width:22px">${tinc?"✓":"○"}</span>
-        <span style="flex:1;font-size:14.5px;text-transform:none;letter-spacing:0;color:var(--text)">${esc(ing(ik).n)}</span>
-        <span style="font-weight:700;color:var(--verd-fosc)">${esc(qtyTxt(ik,shopRound(g)))}</span></div>`;
-    }
-    h += `</div>`;
-  }
-  if(preps.length){
-    h += `<div class="wk"><h3>Per preparar a casa</h3>`+
-      preps.map(k=>`<div style="padding:7px 0;border-top:1px solid #f1efe7">
-        <b style="font-size:14px">${esc(ing(k).n)}</b>
-        <div style="font-size:12.5px;color:var(--gris);margin-top:3px;line-height:1.45">${esc(ing(k).recepta)}</div></div>`).join("")+
-      `</div>`;
-  }
-  return h;
-}
-function marcarCompra(k){
-  if(S.pantry[k]) delete S.pantry[k]; else S.pantry[k]=1;
-  saveState(true); pintar();
-}
-
-/* =====================================================================
-   VISTA: MÉS
-   ===================================================================== */
-function vistaMes(){
-  const e = Sync.est;
-  let h = `<div class="dtitle">Opcions</div>`;
-  h += `<div class="wk"><h3>Sincronització</h3>`;
-  if(!Sync.configurat()){
-    h += `<div style="font-size:13.5px;color:var(--gris);margin-top:6px">
-      Ara mateix aquest mòbil guarda el menú i les fotos només aquí.
-      Per connectar-lo amb l'ordinador cal configurar la sincronització
-      seguint la guia.</div>`;
-  } else if(e.estat==="sense-sessio"){
-    h += `<div style="font-size:13.5px;color:var(--gris);margin:6px 0 10px">
-      Inicia la sessió per rebre el menú i enviar les fotos.</div>
-      <input class="camp" id="lgEmail" type="email" placeholder="Correu" autocomplete="username">
-      <input class="camp" id="lgPass" type="password" placeholder="Contrasenya" autocomplete="current-password">
-      <button class="btn" onclick="entrar()">Entrar</button>
-      <div id="lgErr" style="color:#c0392b;font-size:13px;margin-top:8px"></div>`;
-  } else if(e.estat==="connectat"){
-    h += `<div style="font-size:13.5px;margin-top:6px">Sessió iniciada com a
-      <b>${esc(e.email)}</b></div>
-      <div style="font-size:12.5px;color:var(--gris);margin:3px 0 10px">
-      ${e.ultimaSync?"Última actualització a les "+e.ultimaSync.toLocaleTimeString("ca-ES",{hour:"2-digit",minute:"2-digit"}):"Sincronitzant…"}</div>
-      <button class="btn g" onclick="Sync.logout()">Tancar la sessió</button>`;
-  } else {
-    h += `<div style="font-size:13.5px;color:var(--gris);margin-top:6px">${esc(e.missatge)}</div>`;
-  }
-  h += `</div>`;
-
-  h += `<div class="wk"><h3>Receptes base</h3>`+
-    Object.entries(allIng()).filter(([k,v])=>v.prep).map(([k,v])=>
-      `<div style="padding:9px 0;border-top:1px solid #f1efe7">
-        <b style="font-size:14.5px">${esc(v.n)}</b>
-        <div style="font-size:12.5px;color:var(--gris);margin-top:4px;line-height:1.5">${esc(v.recepta)}</div>
-      </div>`).join("")+`</div>`;
-
-  h += `<div class="wk"><h3>L'estructura del dia</h3>
-    <div class="li"><span>7.30h</span><span>Esmorzar</span></div>
-    <div class="li"><span>11h</span><span>Batut de mig matí</span></div>
-    <div class="li"><span>13.30h</span><span>Dinar</span></div>
-    <div class="li"><span>17h</span><span>Berenar</span></div>
-    <div class="li"><span>21h</span><span>Sopar</span></div>
-    <div style="font-size:12.5px;color:var(--gris);margin-top:9px;line-height:1.5">
-      Descansa entre 30 i 40 minuts després del dinar i del sopar.
-      El passeig es pot repartir en 30 minuts al matí i 30 al vespre.
-      El batut es deixa preparat la nit anterior.</div></div>`;
-
-  h += `<div class="wk"><h3>Fotos guardades</h3>
-    <div id="comptaFotos" style="font-size:13.5px;color:var(--gris);margin-top:5px">Comptant…</div></div>`;
-  return h;
-}
-async function comptarFotos(){
-  const el = document.getElementById("comptaFotos");
-  if(!el) return;
-  const k = await Fotos.claus();
-  el.textContent = k.length===0 ? "Encara no hi ha cap foto."
-    : k.length===1 ? "1 foto guardada en aquest mòbil."
-    : k.length+" fotos guardades en aquest mòbil.";
-}
-async function entrar(){
-  const err = document.getElementById("lgErr");
-  err.textContent = "";
-  try{
-    await Sync.login(document.getElementById("lgEmail").value.trim(),
-                     document.getElementById("lgPass").value);
-  }catch(e){
-    err.textContent = /password|credential|user-not-found/i.test(e.code||e.message)
-      ? "El correu o la contrasenya no són correctes." : "No s'ha pogut entrar. Comprova la connexió.";
-  }
+function marcarSensacio(mealId, val){
+  const day = dayData(DS);
+  if(day.sensacio[mealId]===val) delete day.sensacio[mealId];
+  else day.sensacio[mealId] = val;
+  tocarDia(DS); pintar();
 }
 
 /* =====================================================================
    FULL LLISCANT
    ===================================================================== */
 function obrirFull(head, body){
-  $("#shHead").innerHTML = head; $("#shBody").innerHTML = body;
-  $("#shov").classList.add("on");
-  requestAnimationFrame(()=>$("#sheet").classList.add("on"));
+  document.getElementById("shHead").innerHTML = head;
+  document.getElementById("shBody").innerHTML = body;
+  document.getElementById("ov").classList.add("on");
+  requestAnimationFrame(()=>document.getElementById("sheet").classList.add("on"));
 }
 function tancarFull(){
-  $("#sheet").classList.remove("on");
-  setTimeout(()=>$("#shov").classList.remove("on"), 220);
+  document.getElementById("sheet").classList.remove("on");
+  setTimeout(()=>document.getElementById("ov").classList.remove("on"), 220);
 }
-$("#shov").onclick = tancarFull;
+document.getElementById("ov").onclick = tancarFull;
 
 /* =====================================================================
-   RENDER
+   CANVIAR UN ÀPAT — dues maneres
    ===================================================================== */
-const VISTES = {dia:vistaDia, setmana:vistaSetmana, compra:vistaCompra, mes:vistaMes};
-function pintar(){
-  pintarStrip();
-  $("#vista").innerHTML = (VISTES[vista]||vistaDia)();
-  for(const [id,v] of Object.entries({tabDia:"dia",tabSetmana:"setmana",
-                                      tabCompra:"compra",tabMes:"mes"}))
-    document.getElementById(id).classList.toggle("on", vista===v);
-  if(vista==="dia") mostrarFotos();
-  if(vista==="mes") comptarFotos();
-}
-$("#tabDia").onclick     = ()=>{ vista="dia";     pintar(); scrollTo(0,0); };
-$("#tabSetmana").onclick = ()=>{ vista="setmana"; pintar(); scrollTo(0,0); };
-$("#tabCompra").onclick  = ()=>{ vista="compra";  pintar(); scrollTo(0,0); };
-$("#tabMes").onclick     = ()=>{ vista="mes";     pintar(); scrollTo(0,0); };
-$("#btnAvui").onclick    = ()=>{ diaSel=iso(TODAY); vista="dia"; pintar(); scrollTo(0,0); };
+let canviCtx = {meal:null, mode:"plats", cons:null};
 
-/* estat de la sincronització */
+function obrirCanvi(mealId){
+  canviCtx = {meal:mealId, mode:"plats", cons:null};
+  const m = MEALS.find(x=>x.id===mealId);
+  obrirFull(`<div class="grip"></div>
+    <div class="shtit"><h2>${m.n}</h2><span style="font-size:12.5px;color:var(--gris)">${m.h}</span></div>
+    <div class="tabs">
+      <button id="tabPlats" class="on" onclick="modeCanvi('plats')">Plats sencers</button>
+      <button id="tabGrups" onclick="modeCanvi('grups')">Muntar-lo jo</button>
+    </div>`, "");
+  modeCanvi("plats");
+}
+function modeCanvi(mode){
+  canviCtx.mode = mode;
+  document.getElementById("tabPlats").classList.toggle("on", mode==="plats");
+  document.getElementById("tabGrups").classList.toggle("on", mode==="grups");
+  document.getElementById("shBody").innerHTML =
+    mode==="plats" ? htmlPlats("") : htmlConstructor();
+  if(mode==="plats"){
+    const c = document.getElementById("cercaPlat");
+    if(c) c.oninput = () => {
+      const v = c.value;
+      document.getElementById("shBody").innerHTML = htmlPlats(v);
+      const c2 = document.getElementById("cercaPlat");
+      if(c2){ c2.value = v; c2.focus(); c2.setSelectionRange(v.length,v.length); c2.oninput = c.oninput; }
+    };
+  }
+}
+
+/* --- a) suggeriments de plat sencer --- */
+function htmlPlats(q){
+  q = (q||"").toLowerCase().trim();
+  const mealId = canviCtx.meal;
+  const day = dayData(DS);
+  const actual = day.meals[mealId];
+  let list = DISHES().filter(d=>d.m.includes(mealId));
+  if(q) list = list.filter(d=>d.n.toLowerCase().includes(q) ||
+      Object.keys(d.i).some(k=>ing(k) && ing(k).n.toLowerCase().includes(q)));
+  return `<input class="cerca" id="cercaPlat" placeholder="Cercar…" value="${esc(q)}">`+
+    (list.length ? list.map(d=>{
+      const f = (mealId==="dinar"||mealId==="sopar") ? faltaApat(d.i, mealId) : checkMeal(d.id, mealId);
+      return `<div class="opt ${actual===d.id?"sel":""}" onclick="triarPlat('${d.id}')">
+        <div class="t">${esc(d.n)}${f.complet?' <span style="color:var(--verd);font-size:12.5px">· equilibrat</span>':""}</div>
+        <div class="s">${esc(ingList(d.i))}</div></div>`;
+    }).join("") : `<div class="buit">Cap plat amb aquest nom.<br>Prova de muntar-lo tu.</div>`);
+}
+function triarPlat(id){
+  const day = dayData(DS), m = canviCtx.meal;
+  day.meals[m] = id;
+  delete day.custom[m];
+  delete day.fora[m];
+  if((m==="dinar"||m==="sopar") && !day.postres[m]){
+    const altre = m==="dinar" ? "sopar" : "dinar";
+    day.postres[m] = day.postres[altre]==="p_iogurt" ? "p_fruita_poma" : "p_iogurt";
+  }
+  tocarDia(DS); tancarFull(); pintar(); anarA(m);
+}
+
+/* --- b) muntar-lo element a element, respectant les racions --- */
+const GRUPS_APAT = {
+  dinar:  ["prot","hc","verd","greix"],
+  sopar:  ["prot","hc","verd","greix"],
+  esmorzar:["hc","prot","greix","fruita"],
+  berenar:["fruita","hc","greix"],
+  migmati:["hc","fruita","greix"],
+};
+function htmlConstructor(){
+  const mealId = canviCtx.meal;
+  if(!canviCtx.cons){
+    /* partim del que ja hi ha, si n'hi ha */
+    const a = apatDelDia(dayData(DS), mealId);
+    canviCtx.cons = (a && a.tipus!=="fora") ? Object.assign({}, a.i) : {};
+  }
+  const cons = canviCtx.cons;
+  const R = racions();
+  const grups = GRUPS_APAT[mealId] || ["prot","hc","verd","greix"];
+  const comptats = racionsDe(cons);
+
+  let h = "";
+  for(const g of grups){
+    const def = R[g]; if(!def) continue;
+    const cal = def.perApat || 1;
+    const triats = (comptats.perGrup[g]||[]);
+    h += `<div class="grup"><div class="gh">
+        <span class="gn">${esc(def.n)}</span>
+        <span class="gr">${cal} raci${cal===1?"ó":"ons"}</span></div>`;
+    if(triats.length){
+      for(const t of triats){
+        h += `<div class="tria"><span class="nm">${esc(ing(t.k).n)}</span>
+          <span class="qq">${esc(qtyTxt(t.k, cons[t.k]))}</span>
+          <button onclick="treureCons('${t.k}')" style="color:var(--gris);font-size:19px;padding:0 4px">×</button></div>`;
+      }
+    } else {
+      h += `<div class="tria buida"><span class="nm">encara no n'has triat cap</span></div>`;
+    }
+    h += `<button class="afegir" onclick="obrirTriaGrup('${g}')">+ afegir ${def.n.toLowerCase()}</button></div>`;
+  }
+
+  const f = faltaApat(cons, mealId);
+  h += `<div class="resum-cons">`;
+  h += f.complet
+    ? `<div class="marca ok" style="margin:0 0 10px">${IC.check} Equilibrat</div>`
+    : `<div class="marca falta" style="margin:0 0 10px">Hi falta ${f.falten.map(x=>x.t).join(" i ")}</div>`;
+  h += `<button class="btn" onclick="desarConstruit()" ${Object.keys(cons).length?"":"disabled"}>
+      Fer servir aquest àpat</button></div>`;
+  return h;
+}
+function obrirTriaGrup(grup){
+  const R = racions()[grup];
+  const cal = R.perApat || 1;
+  const comptats = racionsDe(canviCtx.cons).total[grup] || 0;
+  /* si al grup li falta menys d'una ració, oferim la fracció que falta */
+  const nRac = (grup==="verd" || grup==="greix") ? 1 : Math.max(1, cal - Math.floor(comptats));
+  const ops = opcionsGrup(grup, nRac);
+  const cont = document.getElementById("shBody");
+  cont.dataset.tornar = "1";
+  cont.innerHTML = `<button class="btn g" style="margin-bottom:12px" onclick="modeCanvi('grups')">‹ Tornar</button>
+    <div style="font-size:12.5px;color:var(--gris);margin-bottom:10px">${esc(R.ajuda||"")}</div>`+
+    ops.map(o=>`<div class="opt" onclick="afegirCons('${o.k}',${o.grams})">
+      <div class="optrow"><div>
+        <div class="t">${esc(o.n)}</div>
+        ${o.nota?`<div class="s">${esc(o.nota)}</div>`:""}
+      </div><div class="q">${esc(o.text)}</div></div></div>`).join("");
+}
+function afegirCons(k, grams){
+  canviCtx.cons[k] = (canviCtx.cons[k]||0) + grams;
+  modeCanvi("grups");
+}
+function treureCons(k){
+  delete canviCtx.cons[k];
+  modeCanvi("grups");
+}
+function desarConstruit(){
+  const day = dayData(DS), m = canviCtx.meal;
+  const cons = canviCtx.cons;
+  if(!Object.keys(cons).length) return;
+  /* El nom es munta per ordre d'importància: primer la proteïna, després
+     els hidrats i la verdura. Així es reconeix d'un cop d'ull. */
+  const ordre = ["prot","hc","verd","fruita","greix"];
+  const noms = Object.keys(cons)
+    .sort((a,b)=>{
+      const ia = ordre.indexOf(grupRacio(a)), ib = ordre.indexOf(grupRacio(b));
+      return (ia<0?9:ia) - (ib<0?9:ib);
+    })
+    .filter(k=>{ const g = grupRacio(k); return g && g!=="greix"; })
+    .map(k=>ing(k)?ing(k).n:k);
+  const nom = noms.length ? noms.slice(0,3).join(", ")+(noms.length>3?"…":"")
+                          : "Àpat adaptat";
+  day.custom[m] = {n: nom, i: Object.assign({},cons)};
+  delete day.fora[m];
+  tocarDia(DS); tancarFull(); pintar(); anarA(m);
+}
+
+/* =====================================================================
+   ÀPAT FORA DE CASA
+   ===================================================================== */
+const PLANTILLES = ["Menú del dia","Restaurant","Casa d'algú","Entrepà","Bar / cafeteria"];
+function obrirFora(mealId){
+  canviCtx = {meal:mealId, mode:"fora", cons:null};
+  const m = MEALS.find(x=>x.id===mealId);
+  const day = dayData(DS);
+  const actual = day.fora[mealId] || {};
+  obrirFull(`<div class="grip"></div>
+    <div class="shtit"><h2>${m.n} fora de casa</h2></div>
+    <div style="font-size:12.5px;color:var(--gris);margin:6px 0 10px">
+      Apunta el que hagis menjat, com et vagi bé. No cal detallar quantitats.</div>`,
+    `<div class="plantilles">`+PLANTILLES.map(p=>
+      `<button class="pl" onclick="posarLloc('${esc(p)}')">${esc(p)}</button>`).join("")+`</div>
+     <input class="camp" id="foraLloc" placeholder="On? (opcional)" value="${esc(actual.lloc||"")}">
+     <textarea class="camp" id="foraTxt" placeholder="Què has menjat?">${esc(actual.text||"")}</textarea>
+     <button class="btn" onclick="desarFora()">Desar</button>
+     ${actual.text?`<button class="btn g" style="margin-top:9px" onclick="treureFora()">Treure-ho</button>`:""}`);
+  setTimeout(()=>{ const t=document.getElementById("foraTxt"); if(t) t.focus(); },120);
+}
+function posarLloc(p){ document.getElementById("foraLloc").value = p; }
+function desarFora(){
+  const txt = document.getElementById("foraTxt").value.trim();
+  const lloc = document.getElementById("foraLloc").value.trim();
+  if(!txt){ alert("Escriu què has menjat."); return; }
+  const day = dayData(DS), m = canviCtx.meal;
+  day.fora[m] = {text:txt, lloc:lloc};
+  delete day.custom[m];
+  tocarDia(DS); tancarFull(); pintar(); anarA(m);
+}
+function treureFora(){
+  const day = dayData(DS);
+  delete day.fora[canviCtx.meal];
+  tocarDia(DS); tancarFull(); pintar();
+}
+function anarA(m){
+  setTimeout(()=>{
+    const el = document.getElementById("meal-"+m);
+    if(el) el.scrollIntoView({behavior:"smooth", block:"center"});
+  },90);
+}
+
+/* =====================================================================
+   FOTOGRAFIES — només la d'avui, mai un àlbum del passat
+   ===================================================================== */
+async function mostrarFotos(){
+  const day = dayData(DS);
+  for(const m of MEALS){
+    const cont = document.getElementById("foto-"+m.id);
+    if(!cont) continue;
+    if(!day.fotos || !day.fotos[m.id]){ cont.innerHTML=""; continue; }
+    const blob = await Sync.baixarFoto(DS, m.id);
+    if(!blob){ cont.innerHTML = `<div class="postr" style="margin-top:10px">Foto desada</div>`; continue; }
+    const url = URL.createObjectURL(blob);
+    cont.innerHTML = `<div class="foto"><img src="${url}" alt="">
+      <button class="x" onclick="treureFoto('${m.id}')">×</button></div>`;
+  }
+}
+function ferFoto(mealId){ camCtx = mealId; document.getElementById("camera").click(); }
+document.getElementById("camera").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if(!f || !camCtx) return;
+  const meal = camCtx; camCtx = null;
+  try{
+    const blob = await Fotos.comprimir(f);
+    await Fotos.desar(DS, meal, blob);
+    const day = dayData(DS);
+    day.fotos[meal] = {u:Date.now(), mida:blob.size};
+    tocarDia(DS); pintar();
+    Sync.pujarFoto(DS, meal, blob).catch(e=>console.warn("pujada:", e));
+  }catch(err){ alert("No s'ha pogut desar la foto: "+err.message); }
+});
+async function treureFoto(mealId){
+  if(!confirm("Vols esborrar aquesta foto?")) return;
+  await Sync.esborrarFoto(DS, mealId);
+  delete dayData(DS).fotos[mealId];
+  tocarDia(DS); pintar();
+}
+
+/* =====================================================================
+   MÉS — receptes, estructura del dia i sessió
+   ===================================================================== */
+document.getElementById("btnMes").onclick = () => {
+  const e = Sync.est;
+  let h = `<div class="blocmes"><h3>Receptes</h3>
+    <div style="font-size:12.5px;color:var(--gris);margin-bottom:4px">
+      Millor preparar-les acompanyada.</div>`+
+    Object.entries(allIng()).filter(([k,v])=>v.prep).map(([k,v])=>
+      `<div style="padding:9px 0;border-top:1px solid #f1efe7">
+        <b style="font-size:14.5px">${esc(v.n)}</b>
+        <div style="font-size:12.5px;color:var(--gris);margin-top:4px;line-height:1.55">${esc(v.recepta||"")}</div>
+      </div>`).join("")+`</div>`;
+
+  h += `<div class="blocmes"><h3>L'estructura del dia</h3>`+
+    MEALS.map(m=>`<div class="li"><span>${m.h}</span><span>${m.n}</span></div>`).join("")+
+    `<div style="font-size:12.5px;color:var(--gris);margin-top:9px;line-height:1.55">
+      Descansa entre 30 i 40 minuts després del dinar i del sopar. El passeig es pot
+      repartir en 30 minuts al matí i 30 al vespre. El batut es deixa preparat la nit abans.
+    </div></div>`;
+
+
+  h += `<div class="blocmes"><h3>Connexió</h3>`;
+  if(!Sync.configurat()){
+    h += `<div style="font-size:13.5px;color:var(--gris)">Aquest mòbil guarda el menú
+      només aquí. Encara no està connectat.</div>`;
+  } else if(e.estat==="sense-sessio"){
+    h += `<div style="font-size:13.5px;color:var(--gris);margin-bottom:10px">
+        Inicia la sessió per rebre el menú.</div>
+      <input class="camp" id="lgEmail" type="email" placeholder="Correu" autocomplete="username">
+      <input class="camp" id="lgPass" type="password" placeholder="Contrasenya" autocomplete="current-password">
+      <button class="btn" onclick="entrar()">Entrar</button>
+      <div id="lgErr" style="color:#c0392b;font-size:13px;margin-top:8px"></div>`;
+  } else if(e.estat==="connectat"){
+    h += `<div style="font-size:13.5px">Connectat com a <b>${esc(e.email)}</b></div>
+      <button class="btn g" style="margin-top:11px" onclick="Sync.logout();tancarFull()">Tancar la sessió</button>`;
+  } else {
+    h += `<div style="font-size:13.5px;color:var(--gris)">${esc(e.missatge)}</div>`;
+  }
+  h += `</div>`;
+
+  obrirFull(`<div class="grip"></div><div class="shtit"><h2>Més</h2></div>
+    <div style="height:8px"></div>`, h);
+};
+async function entrar(){
+  const err = document.getElementById("lgErr"); err.textContent = "";
+  try{
+    await Sync.login(document.getElementById("lgEmail").value.trim(),
+                     document.getElementById("lgPass").value);
+    tancarFull();
+  }catch(e){
+    err.textContent = /password|credential|user-not-found|invalid/i.test(e.code||e.message)
+      ? "El correu o la contrasenya no són correctes."
+      : "No s'ha pogut entrar. Comprova la connexió.";
+  }
+}
+
+/* =====================================================================
+   ESTAT I ARRENCADA
+   ===================================================================== */
 function pintarSinc(e, hiHaCanvis){
-  const p = $("#sinc .p");
-  p.className = "p" + (e.estat==="connectat" ? "" :
-                       e.estat==="error" ? " err" : " off");
-  $("#sincTxt").textContent =
+  const p = document.querySelector("#sinc .p");
+  p.className = "p" + (e.estat==="connectat" ? "" : e.estat==="error" ? " err" : " off");
+  document.getElementById("sincTxt").textContent =
     e.estat==="connectat" ? "Connectat" :
     e.estat==="sense-sessio" ? "Sessió no iniciada" :
     e.estat==="carregant" ? "Connectant…" : e.missatge;
   if(hiHaCanvis){ netejarNutri(); pintar(); }
-  else if(e.estat!=="connectat" && vista==="mes") pintar();
 }
 
 pintar();
 Sync.init(pintarSinc);
 
-/* En tornar a l'aplicatiu, si ha canviat el dia el posem al dia d'avui */
+/* Si canvia el dia mentre l'aplicatiu està obert, es recarrega */
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState!=="visible") return;
   const avui = new Date(); avui.setHours(0,0,0,0);
-  if(iso(avui)!==iso(TODAY)) location.reload();
-  else pintar();
+  if(iso(avui)!==DS) location.reload(); else pintar();
 });
 </script>
 </body>
