@@ -587,26 +587,70 @@ async function mostrarFotos(){
     if(!cont) continue;
     if(!day.fotos || !day.fotos[m.id]){ cont.innerHTML=""; continue; }
     const blob = await Sync.baixarFoto(DS, m.id);
+    const pendent = day.fotos[m.id].pujada === false;
     if(!blob){ cont.innerHTML = `<div class="postr" style="margin-top:10px">Foto desada</div>`; continue; }
     const url = URL.createObjectURL(blob);
     cont.innerHTML = `<div class="foto"><img src="${url}" alt="">
-      <button class="x" onclick="treureFoto('${m.id}')">×</button></div>`;
+      <button class="x" onclick="treureFoto('${m.id}')">×</button></div>
+      ${pendent ? `<div class="postr" style="margin-top:6px">Encara no s'ha enviat · s'enviarà sola</div>` : ""}`;
   }
 }
-function ferFoto(mealId){ camCtx = mealId; document.getElementById("camera").click(); }
+/* Quan s'obre la càmera, Android pot descarregar la pàgina de memòria i
+   tornar-la a carregar en acabar. Per això l'àpat pendent no es guarda en
+   una variable —es perdria— sinó al magatzem de la sessió. */
+function ferFoto(mealId){
+  try{ sessionStorage.setItem("mv_foto_apat", mealId); }catch(e){}
+  camCtx = mealId;
+  document.getElementById("camera").click();
+}
 document.getElementById("camera").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = "";
-  if(!f || !camCtx) return;
-  const meal = camCtx; camCtx = null;
+  let meal = camCtx;
+  if(!meal){ try{ meal = sessionStorage.getItem("mv_foto_apat"); }catch(e){} }
+  camCtx = null;
+  try{ sessionStorage.removeItem("mv_foto_apat"); }catch(e){}
+  if(!f) return;
+  if(!meal){ alert("No he pogut saber a quin àpat corresponia la foto. Torna-ho a provar."); return; }
+  const cont = document.getElementById("foto-"+meal);
+  if(cont) cont.innerHTML = `<div class="postr" style="margin-top:10px">Desant la foto…</div>`;
   try{
     const blob = await Fotos.comprimir(f);
     await Fotos.desar(DS, meal, blob);
     const day = dayData(DS);
-    day.fotos[meal] = {u:Date.now(), mida:blob.size};
-    tocarDia(DS); pintar();
-    Sync.pujarFoto(DS, meal, blob).catch(e=>console.warn("pujada:", e));
-  }catch(err){ alert("No s'ha pogut desar la foto: "+err.message); }
+    day.fotos[meal] = {u:Date.now(), mida:blob.size, pujada:false};
+    tocarDia(DS);
+    pintar();
+    enviarFoto(DS, meal, blob);
+  }catch(err){
+    alert("No s'ha pogut desar la foto: "+(err.message||err));
+    pintar();
+  }
 });
+
+/* Enviament amb reintent. Si no hi ha connexió o falla, la foto es queda
+   marcada com a pendent i es torna a provar en obrir l'aplicatiu o quan
+   es recupera la sessió. Abans es quedava al mòbil per sempre. */
+async function enviarFoto(ds, meal, blob){
+  try{
+    if(!blob) blob = await Fotos.llegir(ds, meal);
+    if(!blob) return;
+    await Sync.pujarFoto(ds, meal, blob);
+    const day = dayData(ds);
+    if(day.fotos[meal]){ day.fotos[meal].pujada = true; tocarDia(ds); }
+    pintar();
+  }catch(e){
+    console.warn("pujada de la foto:", e);
+    pintar();
+  }
+}
+/* Repassa totes les fotos que encara no han pujat */
+async function reintentarFotos(){
+  if(Sync.est.estat !== "connectat") return;
+  for(const setmana of Object.values(S.weeks||{}))
+    for(const [ds, dia] of Object.entries(setmana))
+      for(const [meal, f] of Object.entries(dia.fotos||{}))
+        if(f && f.pujada === false) await enviarFoto(ds, meal, null);
+}
 async function treureFoto(mealId){
   if(!confirm("Vols esborrar aquesta foto?")) return;
   await Sync.esborrarFoto(DS, mealId);
@@ -682,6 +726,7 @@ function pintarSinc(e, hiHaCanvis){
     e.estat==="sense-sessio" ? "Sessió no iniciada" :
     e.estat==="carregant" ? "Connectant…" : e.missatge;
   if(hiHaCanvis){ netejarNutri(); pintar(); }
+  if(e.estat === "connectat") reintentarFotos();
 }
 
 pintar();
@@ -691,7 +736,7 @@ Sync.init(pintarSinc);
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState!=="visible") return;
   const avui = new Date(); avui.setHours(0,0,0,0);
-  if(iso(avui)!==DS) location.reload(); else pintar();
+  if(iso(avui)!==DS) location.reload(); else { pintar(); reintentarFotos(); }
 });
 </script>
 </body>
