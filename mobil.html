@@ -75,6 +75,17 @@ main{padding:14px 16px 0}
 .ara-tag{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
  color:#fff;background:var(--verd);padding:3px 9px;border-radius:99px}
 .mb{padding:9px 15px 15px}
+/* ---------- àpat plegat ---------- */
+.meal.plegat .mh{padding-bottom:0}
+.plegat-cap{display:flex;align-items:center;gap:10px;padding:9px 15px 13px;cursor:pointer}
+.plegat-cap .nm{flex:1;font-size:15.5px;font-weight:600;line-height:1.3}
+.plegat-cap .nm.buit{color:#b6b3a8;font-weight:500;font-style:italic;font-size:14px}
+.plegat-cap .fl{color:var(--gris);font-size:13px;flex:none;transition:transform .18s}
+.plegat-cap .mini{display:flex;gap:5px;align-items:center;flex:none}
+.pt{width:8px;height:8px;border-radius:99px;flex:none}
+.pt.ok{background:var(--verd)}
+.pt.falta{background:#e8bd4a}
+.pt.fora{background:#8fa3b5}
 .plat{font-size:17.5px;font-weight:700;line-height:1.3}
 .plat.buit{color:#b6b3a8;font-weight:500;font-style:italic;font-size:15px}
 .marca{display:inline-flex;align-items:center;gap:5px;border-radius:99px;
@@ -211,6 +222,10 @@ textarea.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-
 
 let DS = iso(TODAY);        // sempre avui
 let camCtx = null;
+/* Àpats que s'han desplegat a mà. Es buiden quan canvia l'àpat "Ara",
+   de manera que la vista torna sola a ensenyar només el que toca. */
+let desplegats = new Set();
+let araAnterior = null;
 
 /* Si arriben del servidor valors nutricionals en aliments personalitzats
    o objectius numèrics, els descartem: aquí no hi pinten res. */
@@ -228,6 +243,9 @@ const IC = {
   check :'<svg class="icona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/></svg>',
 };
 
+function desplegar(mealId){ desplegats.add(mealId); pintar(); anarA(mealId); }
+function plegar(mealId){ desplegats.delete(mealId); pintar(); }
+
 function apatActual(){
   const ara = new Date().getHours()*60 + new Date().getMinutes();
   const talls = [[0,"esmorzar"],[9*60+30,"migmati"],[12*60,"dinar"],[15*60+30,"berenar"],[19*60,"sopar"]];
@@ -243,6 +261,8 @@ function pintar(){
   const day = dayData(DS);
   const dt  = parseDay(DS);
   const ara = apatActual();
+  if(araAnterior !== null && araAnterior !== ara) desplegats.clear();
+  araAnterior = ara;
   const chk = checkDay(day);
 
   document.getElementById("data").textContent = fmtLong(dt);
@@ -264,11 +284,37 @@ function pintar(){
     if(a) algun = true;
     const bloc = esValidat(day);
     const teFoto = !!(day.fotos && day.fotos[m.id]);
+    /* Només es veu desplegat l'àpat que toca ara. La resta, el nom i
+       prou; es desplega tocant-los, i es torna a plegar sol quan
+       l'hora avança. */
+    const obertManual = desplegats.has(m.id);
+    const desplegat = (ara===m.id) || obertManual;
+
+    if(!desplegat){
+      const est = !a ? "" : a.tipus==="fora" ? "fora"
+                : (faltaApat(a.i, m.id).complet ? "ok" : "falta");
+      h += `<div class="meal plegat" id="meal-${m.id}">
+        <div class="mh">
+          <span class="hora">${m.h}</span>
+          <span class="nomapat">${m.n}</span>
+        </div>
+        <div class="plegat-cap" onclick="desplegar('${m.id}')">
+          <span class="nm ${a?"":"buit"}">${a ? esc(a.tipus==="fora" ? "Àpat fora de casa" : a.n) : "Sense triar"}</span>
+          <span class="mini">${est?`<span class="pt ${est}"></span>`:""}
+            ${teFoto?'<span class="pt" style="background:#c9c5b6"></span>':""}</span>
+          <span class="fl">▾</span>
+        </div></div>`;
+      continue;
+    }
+
     h += `<div class="meal ${ara===m.id?"ara":""}" id="meal-${m.id}">
       <div class="mh">
         <span class="hora">${m.h}</span>
         <span class="nomapat">${m.n}</span>
         ${ara===m.id?'<span class="ara-tag">ara</span>':""}
+        ${obertManual && ara!==m.id
+          ? `<button style="margin-left:auto;color:var(--gris);font-size:13px"
+              onclick="plegar('${m.id}')">plegar ▴</button>` : ""}
       </div>
       <div class="mb">`;
 

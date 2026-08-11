@@ -343,6 +343,7 @@ function dayData(dateStr){
   d.custom   = d.custom   || {};   // àpat que ella ha construït element a element
   d.fora     = d.fora     || {};   // àpat fet fora de casa, en text
   d.sensacio = d.sensacio || {};   // v | t | r  (mai se li mostra l'històric)
+  d.supervisio = d.supervisio || {}; // sup | prep | sola (el marca el pare)
   d.postres  = d.postres  || {};
   d.habits   = d.habits   || [];
   d.fotos    = d.fotos    || {};
@@ -358,6 +359,27 @@ const SENSACIONS = [
   {id:"t", n:"Regular",  color:"#d9a219"},
   {id:"r", n:"Malament", color:"#c0392b"},
 ];
+
+/* Nivell d'acompanyament de cada àpat. El marca el pare des del seu
+   aplicatiu i el veuen ell, la nutricionista i la psicòloga; mai ella.
+
+   L'escala és deliberadament NEUTRA: el mateix color amb tres
+   ompliments, no un semàfor. Menjar sense supervisió no és el cas
+   pitjor — en recuperació sol ser justament el progrés que es busca—,
+   i un vermell hi posaria una lectura que no toca. */
+const SUPERVISIO = [
+  {id:"sup",  n:"Vaig supervisar l'àpat",              curt:"supervisat", omplert:"ple"},
+  {id:"prep", n:"Hi vaig ser a la preparació",         curt:"preparació", omplert:"mig"},
+  {id:"sola", n:"Va menjar sola",                      curt:"sola",       omplert:"buit"},
+];
+const COLOR_SUP = "#5b6b7a";      // gris blavós, sense càrrega de valor
+
+function marcarSupervisio(dataStr, mealId, val){
+  const day = dayData(dataStr);
+  if(!val || day.supervisio[mealId] === val) delete day.supervisio[mealId];
+  else day.supervisio[mealId] = val;
+}
+const supervisioDe = (day, mealId) => (day && day.supervisio) ? day.supervisio[mealId] : null;
 
 /* ---------------------------------------------------------------------
    Què hi ha en un àpat d'un dia. Té tres orígens possibles i aquesta
@@ -546,10 +568,44 @@ function proposarSetmana(mon, opcions){
       if(pref.length) p = pref;
       if(p.length){ day.meals.sopar = p[(i*5+2)%p.length].id; canvis++; }
     }
+    /* Fins aquí hem triat àpats bons per separat. Ara comprovem el dia
+       sencer: pot passar que dinar i sopar siguin tots dos de verdura
+       cuita i el dia es quedi sense verdura crua, i llavors surt en
+       taronja tot i tenir els cinc àpats en verd. */
+    ajustarDia(day, i, P, bloquejat);
     if(!day.postres.dinar) day.postres.dinar = i%2===0 ? "p_iogurt" : fruites[i%fruites.length];
     if(!day.postres.sopar) day.postres.sopar = i%2===0 ? fruites[i%fruites.length] : "p_iogurt";
   }
   return canvis;
+}
+
+/* Repassa un dia ja assignat i el corregeix si no acaba de quadrar.
+   Dues coses: que hi hagi verdura crua i cuita, i que el dinar i el
+   sopar no siguin mai el mateix plat. */
+function ajustarDia(day, i, P, bloquejat){
+  const lliure = mid => !bloquejat(mid) && !esValidat(day);
+
+  /* 1. dinar i sopar mai el mateix */
+  if(day.meals.dinar && day.meals.dinar === day.meals.sopar && lliure("sopar")){
+    const alt = P.sopar.filter(d => d.id !== day.meals.dinar);
+    if(alt.length) day.meals.sopar = alt[i % alt.length].id;
+  }
+
+  /* 2. verdura crua: en calen 100 g comptant el dia sencer */
+  const cruaDelDia = () => structure(dayItems(day)).g.verd_c;
+  if(cruaDelDia() >= 100) return;
+
+  for(const mid of ["sopar","dinar"]){
+    if(!lliure(mid)) continue;
+    const altre = mid === "sopar" ? day.meals.dinar : day.meals.sopar;
+    const abans = day.meals[mid];
+    const cand = P[mid].filter(d =>
+      d.id !== abans && d.id !== altre && structure(d.i).g.verd_c >= 100);
+    if(!cand.length) continue;
+    day.meals[mid] = cand[i % cand.length].id;
+    if(cruaDelDia() >= 100) return;
+    day.meals[mid] = abans;          // no ha servit: ho deixem com estava
+  }
 }
 
 /* ---------------------------------------------------------------------

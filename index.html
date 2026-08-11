@@ -217,6 +217,21 @@ tr:last-child td{border-bottom:none}
  justify-content:center;z-index:60;padding:24px}
 .zoom.on{display:flex}
 .zoom img{max-width:100%;max-height:100%;border-radius:10px}
+.zoom .caixa{display:flex;flex-direction:column;align-items:center;gap:14px;max-height:100%}
+.zoom .tancar{background:#fff;color:var(--text);border-radius:11px;padding:11px 22px;
+ font-weight:700;font-size:14.5px}
+.zoom .creu{position:fixed;top:18px;right:22px;background:rgba(255,255,255,.92);
+ color:var(--text);width:42px;height:42px;border-radius:99px;font-size:22px;line-height:1}
+/* la sensació d'ella és un quadrat, per distingir-la de la resta de marques */
+.quad{width:11px;height:11px;display:inline-block;flex:none;border-radius:2px}
+/* nivell d'acompanyament: mateix color, tres ompliments. Escala neutra */
+.sup{width:12px;height:12px;border-radius:99px;border:2px solid #5b6b7a;
+ display:inline-block;flex:none;vertical-align:-2px}
+.sup.ple{background:#5b6b7a}
+.sup.mig{background:linear-gradient(90deg,#5b6b7a 50%,transparent 50%)}
+.sup.buit{background:transparent}
+.foto-marca{background:none;padding:0 2px;font-size:12px;color:var(--gris);line-height:1}
+.foto-marca:hover{color:var(--verd-fosc)}
 .no-print{}
 @media print{
   header.top,.tabs,.no-print{display:none!important}
@@ -252,7 +267,13 @@ tr:last-child td{border-bottom:none}
 <main class="wrap" id="view"></main>
 
 <div class="ov" id="ov"><div class="modal" id="modal"></div></div>
-<div class="zoom" id="zoom"><img id="zoomImg" alt=""></div>
+<div class="zoom" id="zoom">
+  <button class="creu" onclick="tancarZoom()" title="Tancar">×</button>
+  <div class="caixa">
+    <img id="zoomImg" alt="">
+    <button class="tancar" onclick="tancarZoom()">Tancar la fotografia</button>
+  </div>
+</div>
 
 <script src="firebase-config.js"></script>
 <script src="core.js"></script>
@@ -378,6 +399,13 @@ function viewSetmana(){
       <button class="btn ghost sm" onclick="buidarSetmana()">Buidar</button>
     </span></div>`;
   if(seg) html += `<div class="small muted" style="margin-bottom:6px">Estàs veient la setmana vinent.</div>`;
+  html += `<div class="small muted" style="margin-bottom:4px;display:flex;gap:18px;flex-wrap:wrap">
+    <span class="row" style="gap:5px">Acompanyament:
+      ${SUPERVISIO.map(x=>`<span class="row" style="gap:4px"><span class="sup ${x.omplert}"></span>
+        <span class="xs">${esc(x.curt)}</span></span>`).join("")}</span>
+    <span class="row" style="gap:5px">Com s'hi ha sentit:
+      ${SENSACIONS.map(x=>`<span class="quad" style="background:${x.color}" title="${esc(x.n)}"></span>`).join("")}</span>
+  </div>`;
   html += `<div class="week">`;
 
   for(let i=0;i<7;i++){
@@ -400,13 +428,19 @@ function viewSetmana(){
       const ms = (obert && d) ? scoreMealFull(d.id, m.id) : null;
       const foto = day.fotos && day.fotos[m.id];
       const sens = day.sensacio && day.sensacio[m.id];
-      const sensCol = sens ? (SENSACIONS.find(x=>x.id===sens)||{}).color : null;
+      const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
+      const sup = supervisioDe(day, m.id);
+      const sx = sup ? SUPERVISIO.find(x=>x.id===sup) : null;
       html += `<div class="slot${val?" block":""}" ${val?"":`onclick="obrirTria('${ds}','${m.id}')"`}>
         <div class="row" style="justify-content:space-between">
-          <span class="lbl">${m.n} · ${m.h}</span>
+          <span class="row" style="gap:5px">
+            ${sx?`<span class="sup ${sx.omplert}" title="${esc(sx.n)}"></span>`:""}
+            <span class="lbl">${m.n} · ${m.h}</span>
+          </span>
           <span class="row" style="gap:4px">
-            ${sensCol?`<span class="dot" style="background:${sensCol}" title="Sensació registrada"></span>`:""}
-            ${foto&&obert?`<span class="xs" title="Té foto">◉</span>`:""}
+            ${sd?`<span class="quad" style="background:${sd.color}" title="S'hi ha sentit ${esc(sd.n.toLowerCase())}"></span>`:""}
+            ${foto&&obert?`<button class="foto-marca" title="Veure la fotografia"
+               onclick="event.stopPropagation();veureFoto('${ds}','${m.id}')">◉</button>`:""}
             ${ms?`<span class="dot ${ms.lvl}"></span>`
                 :(c&&c.complet?`<span class="dot v"></span>`:"")}
           </span>
@@ -473,10 +507,12 @@ function openModal(html, narrow){
 }
 function closeModal(){ $("#ov").classList.remove("on"); }
 $("#ov").addEventListener("click", e=>{ if(e.target.id==="ov") closeModal(); });
-$("#zoom").addEventListener("click", ()=>$("#zoom").classList.remove("on"));
+function obrirZoom(url){ $("#zoomImg").src = url; $("#zoom").classList.add("on"); }
+function tancarZoom(){ $("#zoom").classList.remove("on"); }
+$("#zoom").addEventListener("click", e=>{ if(e.target.id==="zoom") tancarZoom(); });
 document.addEventListener("keydown", e=>{
   if(e.key!=="Escape") return;
-  if($("#zoom").classList.contains("on")) $("#zoom").classList.remove("on");
+  if($("#zoom").classList.contains("on")) tancarZoom();
   else closeModal();
 });
 
@@ -581,8 +617,11 @@ function obrirDia(ds){
       ${a && a.tipus==="lliure" ? `<div class="xs"><span class="tag">adaptat per ella</span></div>` : ""}
       ${a && a.tipus!=="fora" ? `<div class="xs muted">${esc(ingList(a.i))}</div>` : ""}
       ${c && c.falten.length ? `<div class="xs muted">Hi falta: ${c.falten.map(x=>esc(x.t)).join(" · ")}</div>` : ""}
-      ${sd ? `<div class="xs" style="margin-top:2px"><span class="dot" style="background:${sd.color}"></span>
-          <span class="muted">s'hi ha sentit ${esc(sd.n.toLowerCase())}</span></div>` : ""}</td>
+      ${sd ? `<div class="xs" style="margin-top:2px"><span class="quad" style="background:${sd.color}"></span>
+          <span class="muted"> s'hi ha sentit ${esc(sd.n.toLowerCase())}</span></div>` : ""}
+      ${(()=>{ const sp=supervisioDe(day,m.id); const sx=sp?SUPERVISIO.find(x=>x.id===sp):null;
+         return sx?`<div class="xs" style="margin-top:2px"><span class="sup ${sx.omplert}"></span>
+           <span class="muted"> ${esc(sx.n.toLowerCase())}</span></div>`:""; })()}</td>
       <td style="width:34px">${ms?`<span class="dot ${ms.lvl}"></span>`
         :(c&&c.complet?`<span class="dot v"></span>`:"")}</td></tr>`;
     if(m.id==="dinar"||m.id==="sopar"){
@@ -629,7 +668,7 @@ async function pintarGaleriaDia(ds){
     if(blob){
       const url = URL.createObjectURL(blob);
       d.innerHTML = `<img src="${url}" alt="${esc(m.n)}"><div class="c"><b>${esc(m.n)}</b>${esc(fmtDay(parseDay(ds)))}</div>`;
-      d.querySelector("img").onclick = ()=>{ $("#zoomImg").src=url; $("#zoom").classList.add("on"); };
+      d.querySelector("img").onclick = ()=>obrirZoom(url);
     } else {
       d.innerHTML = `<div class="c" style="padding:22px 8px;text-align:center">
         <b>${esc(m.n)}</b>Foto al mòbil, encara no descarregada</div>`;
@@ -1533,9 +1572,11 @@ function analitzar(dies){
     nDies:dies.length, complets:0, validats:0, equilibrats:0, valorables:0,
     apats:{total:0, programat:0, lliure:0, fora:0},
     sensPerApat:{}, sensTotal:{v:0,t:0,r:0}, senseSens:0,
+    sup:{sup:0, prep:0, sola:0, sense:0}, supPerApat:{},
     fora:[], adaptats:[], habits:{}, tria:{},
   };
-  for(const m of MEALS) r.sensPerApat[m.id] = {v:0,t:0,r:0, total:0};
+  for(const m of MEALS){ r.sensPerApat[m.id] = {v:0,t:0,r:0, total:0};
+    r.supPerApat[m.id] = {sup:0, prep:0, sola:0, total:0}; }
   for(const h of HABITS) r.habits[h.id] = 0;
 
   for(const [ds, day] of dies){
@@ -1558,6 +1599,9 @@ function analitzar(dies){
       const s = day.sensacio && day.sensacio[m.id];
       if(s){ r.sensPerApat[m.id][s]++; r.sensPerApat[m.id].total++; r.sensTotal[s]++; }
       else r.senseSens++;
+      const sp = supervisioDe(day, m.id);
+      if(sp && r.sup[sp]!=null){ r.sup[sp]++; r.supPerApat[m.id][sp]++; r.supPerApat[m.id].total++; }
+      else r.sup.sense++;
     }
   }
   return r;
@@ -1602,6 +1646,38 @@ function viewSeguiment(){
       <tr><td>Fets fora de casa</td><td class="qty" style="text-align:right">${r.apats.fora}</td>
         <td class="qty" style="text-align:right">${pc(r.apats.fora)}%</td></tr>
     </table></div>`;
+
+  /* --- acompanyament --- */
+  const totalSup = r.sup.sup + r.sup.prep + r.sup.sola;
+  h += `<div class="sec-title"><h2>Acompanyament dels àpats</h2>
+    <span class="muted small">${totalSup} de ${r.apats.total} àpats registrats</span></div>`;
+  if(!totalSup){
+    h += `<div class="card pad muted">Encara no s'ha registrat l'acompanyament en aquest període.</div>`;
+  } else {
+    h += `<div class="card pad"><table>`;
+    for(const x of SUPERVISIO){
+      const n = r.sup[x.id], p = Math.round(n/totalSup*100);
+      h += `<tr><td><span class="sup ${x.omplert}"></span> ${esc(x.n)}</td>
+        <td class="qty" style="text-align:right;width:80px">${n}</td>
+        <td class="qty" style="text-align:right;width:60px">${p}%</td>
+        <td style="width:170px"><div class="kbar"><span style="width:${p}%;background:#5b6b7a"></span></div></td></tr>`;
+    }
+    h += `</table><div class="small muted" style="margin-top:10px">Descriu l'acompanyament que hi
+      va haver, no com ho va fer ella. L'escala no ordena de millor a pitjor.</div>`;
+    /* desglossat per àpat, que és el que orienta */
+    const amb = MEALS.filter(m=>r.supPerApat[m.id].total>0);
+    if(amb.length){
+      h += `<table style="margin-top:14px"><tr><th>Àpat</th>
+        ${SUPERVISIO.map(x=>`<th style="text-align:center">${esc(x.curt)}</th>`).join("")}</tr>`;
+      for(const m of amb){
+        const v = r.supPerApat[m.id];
+        h += `<tr><td><b>${m.n}</b></td>`+
+          SUPERVISIO.map(x=>`<td class="qty" style="text-align:center">${v[x.id]||"·"}</td>`).join("")+`</tr>`;
+      }
+      h += `</table>`;
+    }
+    h += `</div>`;
+  }
 
   /* --- sensacions, desglossades per àpat --- */
   const totalSens = r.sensTotal.v + r.sensTotal.t + r.sensTotal.r;
@@ -1709,6 +1785,9 @@ function copiarSeguiment(){
   t += "  Tal com estaven programats: "+r.apats.programat+"\n";
   t += "  Adaptats per ella: "+r.apats.lliure+"\n";
   t += "  Fets fora de casa: "+r.apats.fora+"\n\n";
+  t += "ACOMPANYAMENT\n";
+  for(const x of SUPERVISIO) t += "  "+x.n.padEnd(36)+r.sup[x.id]+"\n";
+  t += "  "+"Sense registrar".padEnd(36)+r.sup.sense+"\n\n";
   t += "SENSACIÓ EN MENJAR\n";
   for(const m of MEALS){
     const s = r.sensPerApat[m.id];
@@ -1725,6 +1804,12 @@ function copiarSeguiment(){
   t += "\nHÀBITS\n";
   for(const x of HABITS) t += "  "+x.n.padEnd(42)+r.habits[x.id]+" de "+r.nDies+"\n";
   navigator.clipboard.writeText(t).then(()=>alert("Informe copiat."), ()=>prompt("Copia l'informe:", t));
+}
+
+async function veureFoto(ds, mealId){
+  const blob = await Sync.baixarFoto(ds, mealId);
+  if(!blob) return alert("La fotografia encara no s'ha pogut descarregar. Comprova la connexió.");
+  obrirZoom(URL.createObjectURL(blob));
 }
 
 /* =====================================================================
@@ -2017,7 +2102,7 @@ async function pintarGaleriaTot(){
     if(blob){
       const url = URL.createObjectURL(blob);
       div.innerHTML = `<img src="${url}" alt=""><div class="c"><b>${esc(m.n)}</b>${esc(fmtLong(parseDay(ds)))}</div>`;
-      div.querySelector("img").onclick = ()=>{ $("#zoomImg").src=url; $("#zoom").classList.add("on"); };
+      div.querySelector("img").onclick = ()=>obrirZoom(url);
     } else {
       div.innerHTML = `<div class="c" style="padding:26px 8px;text-align:center">
         <b>${esc(m.n)}</b>${esc(fmtDay(parseDay(ds)))} · no descarregada</div>`;

@@ -85,6 +85,22 @@ textarea.camp{min-height:90px;resize:vertical}
 .fila .v{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .avis{font-size:12.5px;color:var(--gris);line-height:1.55;margin-top:12px}
 .buit{text-align:center;color:var(--gris);padding:34px 20px;font-size:14.5px}
+/* ---------- validació diària ---------- */
+.vfila{padding:13px 0;border-bottom:1px solid #f0f3f6}
+.vfila:last-child{border-bottom:none}
+.vnom{font-size:15px;font-weight:700;margin-bottom:2px}
+.vhora{font-size:11.5px;color:var(--gris);margin-bottom:9px}
+.vopts{display:flex;gap:7px}
+.vo{flex:1;padding:9px 6px;border-radius:11px;border:1px solid var(--linia);
+ background:var(--suau);display:flex;flex-direction:column;align-items:center;gap:5px;
+ font-size:10.5px;color:var(--gris);line-height:1.25;text-align:center}
+.vo.on{border-color:#5b6b7a;border-width:2px;padding:8px 5px;color:#274054;font-weight:700;
+ background:#eef1f4}
+/* marques neutres: mateix color, tres ompliments */
+.mk{width:17px;height:17px;border-radius:99px;border:2px solid #5b6b7a;flex:none}
+.mk.ple{background:#5b6b7a}
+.mk.mig{background:linear-gradient(90deg,#5b6b7a 50%,transparent 50%)}
+.mk.buit{background:transparent}
 </style>
 </head>
 <body>
@@ -118,6 +134,12 @@ textarea.camp{min-height:90px;resize:vertical}
     <div class="avis">Perquè dues pesades siguin comparables convé fer-les sempre igual:
       la mateixa hora, després del bany i amb roba equivalent.</div>
   </div>
+  <div class="card" style="margin-top:14px">
+    <div class="lb">Acompanyament dels àpats d'avui</div>
+    <div id="validacio"></div>
+    <div class="avis">Serveix per al seguiment de la nutricionista i la psicòloga.
+      Descriu l'acompanyament que hi va haver, no com ho va fer ella.</div>
+  </div>
 </main>
 
 <div class="ov" id="ov"></div>
@@ -136,11 +158,14 @@ let DS = iso(TODAY);
 
 document.getElementById("data").textContent = fmtLong(TODAY);
 
+/* Es passa la POSICIÓ a la llista, no el text. Amb el text, l'apòstrof
+   de "Abans d'esmorzar" tancava la cadena i el botó es quedava mut. */
 function pintarChips(){
-  document.getElementById("chips").innerHTML = CONDICIONS.map(c=>
-    `<button class="ch ${cond.includes(c)?"on":""}" onclick="marcarCond('${c}')">${esc(c)}</button>`).join("");
+  document.getElementById("chips").innerHTML = CONDICIONS.map((c,i)=>
+    `<button class="ch ${cond.includes(c)?"on":""}" onclick="marcarCond(${i})">${esc(c)}</button>`).join("");
 }
-function marcarCond(c){
+function marcarCond(idx){
+  const c = CONDICIONS[idx]; if(!c) return;
   const i = cond.indexOf(c);
   if(i<0) cond.push(c); else cond.splice(i,1);
   pintarChips();
@@ -185,9 +210,54 @@ document.getElementById("desar").onclick = () => {
   }
   saveState(true);
   if(typeof Sync!=="undefined") Sync.pushConfig();
-  document.getElementById("avisOk").innerHTML = `<div class="ok">${esc(avis)}</div>`;
+  document.getElementById("avisOk").innerHTML = `<div class="ok">✓ ${esc(avis)}</div>`;
+  confirmarBoto("desar", "✓ Desat");
+  pintarValidacio();
   window.scrollTo({top:0, behavior:"smooth"});
 };
+
+/* El botó diu que ha desat durant uns segons. Sense això no quedava
+   clar que hagués passat res. */
+function confirmarBoto(id, text){
+  const b = document.getElementById(id);
+  if(!b || b.dataset.ocupat) return;
+  const abans = b.textContent;
+  b.dataset.ocupat = "1";
+  b.textContent = text;
+  b.style.background = "#2f7d32";
+  setTimeout(()=>{
+    b.textContent = abans; b.style.background = "";
+    delete b.dataset.ocupat;
+  }, 2200);
+}
+
+/* =====================================================================
+   VALIDACIÓ DIÀRIA — quin acompanyament va tenir cada àpat
+   Es llisten els àpats pel seu nom (Esmorzar, Dinar…) i no pel del plat,
+   perquè ella el pot haver canviat i el nom quedaria desfasat.
+   ===================================================================== */
+function pintarValidacio(){
+  const day = dayData(DS);
+  document.getElementById("validacio").innerHTML = MEALS.map(m=>{
+    const actual = day.supervisio[m.id];
+    return `<div class="vfila">
+      <div class="vnom">${m.n}</div>
+      <div class="vhora">${m.h}</div>
+      <div class="vopts">`+
+      SUPERVISIO.map((x,i)=>`<button class="vo ${actual===x.id?"on":""}"
+          onclick="marcarSup('${m.id}',${i})">
+          <span class="mk ${x.omplert}"></span><span>${esc(x.n)}</span></button>`).join("")+
+      `</div></div>`;
+  }).join("");
+}
+function marcarSup(mealId, idx){
+  const x = SUPERVISIO[idx]; if(!x) return;
+  marcarSupervisio(DS, mealId, x.id);
+  saveState(true);
+  if(typeof Sync!=="undefined") tocarDia(DS);
+  pintarValidacio();
+}
+pintarValidacio();
 
 /* --- historial, darrere d'un toc --- */
 document.getElementById("btnHist").onclick = () => {
@@ -239,7 +309,7 @@ function pintarSinc(e, canvis){
     e.estat==="sense-sessio" ? "toca per iniciar la sessió" :
     e.estat==="carregant" ? "connectant…" :
     e.estat==="error" ? "sense connexió" : "només aquest aparell";
-  if(canvis) carregarAvui();
+  if(canvis){ carregarAvui(); pintarValidacio(); }
 }
 document.getElementById("sinc").onclick = () => {
   if(Sync.est.estat==="connectat"){
