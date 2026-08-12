@@ -482,7 +482,18 @@ function triarPlat(id){
     const altre = m==="dinar" ? "sopar" : "dinar";
     day.postres[m] = day.postres[altre]==="p_iogurt" ? "p_fruita_poma" : "p_iogurt";
   }
-  tocarDia(DS); tancarFull(); pintar(); anarA(m);
+  cadena(m); tocarDia(DS); tancarFull(); pintar(); anarA(m);
+}
+
+/* Reprogramació en cadena dels dos àpats principals següents.
+   Aquí no es pinta res ni se n'informa: ella només veu el dia en curs, i
+   la marca que deixa (day.auto) no la llegeix cap pantalla d'aquest
+   aplicatiu. L'avís i el botó de desfer són cosa de l'ordinador.
+   Es criden els tocarDia() de cada dia mogut perquè tocarDia només
+   empeny la setmana del dia que rep i la cadena pot passar de setmana. */
+function cadena(mealId){
+  const r = reprogramarCadena(DS, mealId, {aplicar:true});
+  for(const ds of r.dies) if(ds !== DS) tocarDia(ds);
 }
 
 /* --- b) muntar-lo element a element, respectant les racions --- */
@@ -577,7 +588,10 @@ function desarConstruit(){
                           : "Àpat adaptat";
   day.custom[m] = {n: nom, i: Object.assign({},cons)};
   delete day.fora[m];
-  tocarDia(DS); tancarFull(); pintar(); anarA(m);
+  /* Un àpat muntat element a element dispara la cadena igual que un plat
+     del catàleg: apatDelDia() el torna amb els ingredients a .i i
+     racionsDe() en treu la proteïna i l'hidrat sense saber d'on vénen. */
+  cadena(m); tocarDia(DS); tancarFull(); pintar(); anarA(m);
 }
 
 /* =====================================================================

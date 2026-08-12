@@ -529,15 +529,20 @@ function postresAlternades(day){
 /* ---------------------------------------------------------------------
    8. PROPOSTA AUTOMÀTICA DE SETMANA
    --------------------------------------------------------------------- */
+
+/* Candidats per a un àpat: els plats que l'admeten, i d'aquests els que
+   surten equilibrats si n'hi ha cap. Si no n'hi ha cap d'equilibrat val
+   més oferir-los tots que no pas quedar-nos sense candidats. */
+function platsBons(mid){
+  const p = DISHES().filter(d=>d.m.includes(mid));
+  const b = p.filter(d=>checkMeal(d.id,mid).complet);
+  return b.length ? b : p;
+}
+
 function proposarSetmana(mon, opcions){
   const o = opcions||{};
   const desde = o.desde || TODAY;          // no toquem res anterior a aquesta data
-  const bons = mid => {
-    const p = DISHES().filter(d=>d.m.includes(mid));
-    const b = p.filter(d=>checkMeal(d.id,mid).complet);
-    return b.length ? b : p;
-  };
-  const P = {}; for(const m of MEALS) P[m.id] = bons(m.id);
+  const P = {}; for(const m of MEALS) P[m.id] = platsBons(m.id);
   const teCrua = d => structure(d.i).g.verd_c >= 100;
   const fruites = ["p_fruita_poma","p_fruita_taronja","p_fruita_pera",
                    "p_fruita_kiwi","p_fruita_platan"];
@@ -606,6 +611,205 @@ function ajustarDia(day, i, P, bloquejat){
     if(cruaDelDia() >= 100) return;
     day.meals[mid] = abans;          // no ha servit: ho deixem com estava
   }
+}
+
+/* =====================================================================
+   8bis. REPROGRAMACIÓ EN CADENA
+   ---------------------------------------------------------------------
+   Quan es canvia un àpat principal, els dos següents no han de repetir
+   ni la proteïna ni l'hidrat que porta el nou.
+
+   Les regles són les tancades l'11 d'agost i no s'han de reobrir:
+     1. només dinar i sopar
+     2. proteïna i hidrat, tots dos
+     3. dos àpats endavant, creuant els dies
+     4. una sola passada: reprogramar no torna a disparar la regla
+     5. des del mòbil s'aplica sol; des de l'ordinador només se suggereix
+     6. l'avís i el desfer viuen a day.auto
+     7. el substitut passa també per ajustarDia()
+     8. si no hi ha substitut que compleixi tot, l'àpat es queda com era
+
+   Un àpat fet fora no dispara res: no en sabem les quantitats, i
+   apatDelDia() ja el torna amb i:{} i valorable:false.
+   --------------------------------------------------------------------- */
+
+const PRINCIPALS = ["dinar","sopar"];
+
+/* A partir de quantes racions considerem que un plat "porta" un aliment.
+   És el mateix 0,4 que faltaApat ja fa servir per als greixos: per sota
+   d'això és una presència testimonial (mitja patata de guarnició) i
+   bloquejar-la ens deixaria sense candidats. */
+const LLINDAR_REPETICIO = 0.4;
+
+/* La proteïna i l'hidrat d'un conjunt d'ingredients. Passa per
+   racionsDe(), o sigui que funciona igual amb un plat del catàleg que
+   amb un àpat que ella hagi muntat element a element. */
+function nutrientsClau(items){
+  const per = racionsDe(items).perGrup;
+  const out = [];
+  for(const grup of ["prot","hc"])
+    for(const x of (per[grup]||[]))
+      if(x.racions >= LLINDAR_REPETICIO) out.push(x.k);
+  return out;
+}
+const nomsAliments = ks =>
+  ks.map(k => ing(k) ? ing(k).n.toLowerCase() : k).join(" i ");
+
+/* Els N àpats principals que vénen després d'aquest, saltant de dia. */
+function apatsSeguents(ds, mealId, quants){
+  const out = [];
+  let j = PRINCIPALS.indexOf(mealId);
+  if(j < 0) return out;
+  let d = parseDay(ds);
+  while(out.length < quants){
+    j++;
+    if(j >= PRINCIPALS.length){ j = 0; d = addDays(d,1); }
+    out.push({ds: iso(d), mealId: PRINCIPALS[j]});
+  }
+  return out;
+}
+
+/* Pany de la condició 4: mentre la cadena s'executa, cap escriptura de
+   dins no en pot tornar a engegar una altra. */
+let enCadena = false;
+
+/* Reprograma (o només calcula, amb aplicar:false) els dos àpats
+   següents. Retorna {canvis, dies, aplicat}: 'canvis' porta un element
+   per àpat mogut i 'dies' les dates tocades, que és el que necessita qui
+   crida per fer un tocarDia() de cadascuna — tocarDia només empeny la
+   setmana del dia que rep, i la cadena pot travessar el cap de setmana. */
+function reprogramarCadena(ds, mealId, opcions){
+  const o = opcions || {};
+  const aplicar = o.aplicar !== false;
+  const buit = {canvis:[], dies:[], aplicat:false};
+  if(!PRINCIPALS.includes(mealId)) return buit;      // condició 1
+  if(enCadena) return buit;                          // condició 4
+
+  const origen = apatDelDia(dayData(ds), mealId);
+  if(!origen || !origen.valorable) return buit;
+  const bloc = new Set(nutrientsClau(origen.i));     // condició 2
+  if(!bloc.size) return buit;
+
+  const P = {}; for(const m of MEALS) P[m.id] = platsBons(m.id);
+  const quan = new Date().toISOString();
+  const canvis = [], fotografies = [];
+
+  enCadena = true;
+  try{
+    for(const t of apatsSeguents(ds, mealId, 2)){    // condició 3
+      /* Les quatre marques del que és intocable. Compte: ajustarDia()
+         només mira les dues últimes (i la validació pel seu compte);
+         la del dia passat no la mira ningú i l'hem de fer aquí. */
+      const dt = parseDay(t.ds);
+      if(dt < TODAY) continue;                        // dia passat
+      /* Si el dia encara no existeix no hi ha res programat, o sigui que
+         no hi ha res a canviar. Val més sortir aquí que no pas cridar
+         dayData(), que el crearia buit i l'enviaria al servidor. */
+      const setmana = S.weeks[weekKey(dt)];
+      if(!setmana || !setmana[t.ds]) continue;
+      const day = dayData(t.ds);
+      if(esValidat(day)) continue;                    // dia validat
+      const bloquejat = mid =>
+        !!((day.custom && day.custom[mid]) || (day.fora && day.fora[mid]));
+      if(bloquejat(t.mealId)) continue;               // adaptat per ella o fet fora
+
+      const actual = day.meals[t.mealId];
+      if(!actual) continue;                           // no hi ha res programat
+      const xoca = nutrientsClau((dishById(actual)||{i:{}}).i)
+        .filter(k => bloc.has(k));
+      if(!xoca.length) continue;                      // no repeteix res
+
+      /* Fotografia del dia sencer: ajustarDia() pot moure també l'altre
+         àpat principal, i el desfer ha de poder-ho tornar tot enrere. */
+      const abans = Object.assign({}, day.meals);
+      const altre = t.mealId==="dinar" ? day.meals.sopar : day.meals.dinar;
+      const cand = P[t.mealId].filter(d =>
+        d.id !== actual && d.id !== altre &&
+        !nutrientsClau(d.i).some(k => bloc.has(k)));
+      if(!cand.length) continue;                      // condició 8
+
+      /* Llavor de rotació: el dia de la setmana del dia de destí. Manté
+         la varietat sense fer-ho aleatori, que faria impossible provar-ho. */
+      const i = (dt.getDay()+6)%7;
+      day.meals[t.mealId] = cand[i % cand.length].id;
+      ajustarDia(day, i, P, bloquejat);               // condició 7
+
+      /* ajustarDia() pot haver tornat a posar-hi allò que volíem evitar:
+         la seva passada 1 canvia el sopar sense saber res de la cadena.
+         Si ha passat, l'àpat es queda com estava. */
+      const final = dishById(day.meals[t.mealId]);
+      if(!final || nutrientsClau(final.i).some(k => bloc.has(k))){
+        day.meals = abans;                            // condició 8
+        continue;
+      }
+
+      for(const mid of PRINCIPALS){
+        if(day.meals[mid] === abans[mid]) continue;
+        canvis.push({ds:t.ds, mealId:mid,
+                     abans: abans[mid] || null,
+                     ara:   day.meals[mid],
+                     motiu: mid===t.mealId
+                       ? "repetia "+nomsAliments(xoca)
+                       : "ajust del dia després del canvi"});
+      }
+      fotografies.push({ds:t.ds, meals:abans});
+    }
+  } finally { enCadena = false; }
+
+  const dies = [...new Set(canvis.map(c=>c.ds))];
+
+  /* Mode suggeriment (ordinador): hem calculat sobre les dades de debò
+     perquè ajustarDia() necessita veure el dia sencer, així que ara ho
+     tornem tot a deixar exactament com estava. */
+  if(!aplicar){
+    for(const f of fotografies) dayData(f.ds).meals = f.meals;
+    return {canvis, dies, aplicat:false};
+  }
+
+  /* Condició 6. Viu dins del dia, o sigui que se sincronitza sol.
+     Si un àpat ja tenia un canvi automàtic pendent, conservem el 'abans'
+     original: desfer ha de tornar al que hi havia abans de tot. */
+  for(const c of canvis){
+    const day = dayData(c.ds);
+    day.auto = day.auto || {};
+    if(day.auto[c.mealId]){
+      day.auto[c.mealId].motiu = c.motiu;
+      day.auto[c.mealId].quan  = quan;
+    } else {
+      day.auto[c.mealId] = {abans:c.abans, motiu:c.motiu, quan};
+    }
+  }
+  return {canvis, dies, aplicat:true};
+}
+
+/* Desfà un canvi automàtic i esborra la marca. */
+function desferAuto(ds, mealId){
+  const day = dayData(ds);
+  if(!day.auto || !day.auto[mealId]) return false;
+  const a = day.auto[mealId];
+  if(a.abans) day.meals[mealId] = a.abans;
+  else delete day.meals[mealId];
+  delete day.auto[mealId];
+  if(!Object.keys(day.auto).length) delete day.auto;
+  return true;
+}
+/* Els canvis automàtics pendents d'un dia, per pintar l'avís.
+   Llegeix S.weeks directament: és una consulta i no ha de crear el dia
+   si no existeix, que és el que faria dayData(). */
+function autosPendents(ds){
+  const setmana = S.weeks[weekKey(parseDay(ds))];
+  const day = setmana && setmana[ds];
+  return Object.entries((day && day.auto) || {})
+    .map(([mealId,a]) => Object.assign({mealId}, a));
+}
+/* Tots els pendents d'una setmana, per a l'avís de dalt de tot. */
+function autosSetmana(mon){
+  const out = [];
+  for(let i=0;i<7;i++){
+    const ds = iso(addDays(mon,i));
+    for(const a of autosPendents(ds)) out.push(Object.assign({ds}, a));
+  }
+  return out;
 }
 
 /* ---------------------------------------------------------------------
@@ -974,5 +1178,8 @@ if (typeof module !== "undefined") module.exports = {
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,
   qtyRef, fruitPieces, postresAlternades, esValidat, TODAY, fmtDay, fmtLong,
-  parseDay, get S(){ return S; }, set S(v){ S = v; },
+  parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
+  platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
+  desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,
+  get S(){ return S; }, set S(v){ S = v; },
 };
