@@ -3,7 +3,7 @@
   "short_name": "Guia Nutricional",
   "description": "Menú diari i indicacions",
   "start_url": "mobil.html",
-  "scope": ".",
+  "scope": "mobil.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f7f4ed",
