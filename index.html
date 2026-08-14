@@ -404,11 +404,26 @@ const OBJECTE_DIA = ds => dayData(ds);
      · quadrat     → com s'hi ha sentit (ho escriu només ella)
    El cercle i el quadrat es distingeixen per la forma i no només pel
    color, que és el que els fa llegibles d'un cop d'ull. */
+/* La boleta d'un àpat o d'un dia. UNA sola pregunta: està complet segons
+   les indicacions de la nutricionista?
+     verd    → complet
+     taronja → hi falta alguna cosa (així es localitza de seguida)
+     gris    → encara no hi ha res
+   Abans, amb sessió iniciada, la boleta venia de scoreMealFull() —les
+   calories i els macros— i podia sortir verda al costat d'un "Hi falta":
+   responien preguntes diferents amb el mateix dibuix. Els números segueixen
+   sortint, però com a text, que és on no es confonen. */
+function boleta(complet, buit, estil){
+  const st = estil ? ` style="${estil}"` : "";
+  if(buit) return `<span class="dot"${st ? st.replace('style="','style="background:#e0ddd2;') : ' style="background:#e0ddd2"'}></span>`;
+  return complet ? `<span class="dot v" title="Complet"${st}></span>`
+                 : `<span class="dot g" title="Hi falta alguna cosa"${st}></span>`;
+}
+
 function llegendaMarques(o){
   const p = [];
   if(o.dots){
-    const nivells = obert ? ["v","g","r"].map(l=>[l, LVLTXT[l].toLowerCase()])
-                          : [["v","equilibrat"]];
+    const nivells = [["v","complet"],["g","hi falta alguna cosa"]];
     p.push(`<span class="row" style="gap:5px">Àpat i dia:
       ${nivells.map(([l,n])=>`<span class="row" style="gap:4px"><span class="dot ${l}"></span>
         <span class="xs">${esc(n)}</span></span>`).join("")}</span>`);
@@ -449,8 +464,7 @@ function viewSetmana(){
       <div class="dhead"><div class="spread">
         <div><div class="dn">${DIES[i]}</div>
         <div class="dd">${fmtDay(dt)}${val?" · validat":avui?" · avui":passat?" · passat":""}</div></div>
-        ${teMenu ? (obert ? `<span class="dot ${sc.lvl}" title="${LVLTXT[sc.lvl]}"></span>`
-                          : (chk.complet?`<span class="dot v" title="Equilibrat"></span>`:"")) : ""}
+        ${teMenu ? boleta(chk.complet, false) : ""}
       </div></div><div class="dbody">`;
     for(const m of MEALS){
       const a = apatDelDia(day, m.id);
@@ -472,8 +486,7 @@ function viewSetmana(){
             ${sd?`<span class="quad" style="background:${sd.color}" title="S'hi ha sentit ${esc(sd.n.toLowerCase())}"></span>`:""}
             ${foto&&obert?`<button class="foto-marca" title="Veure la fotografia"
                onclick="event.stopPropagation();veureFoto('${ds}','${m.id}')">◉</button>`:""}
-            ${ms?`<span class="dot ${ms.lvl}"></span>`
-                :(c&&c.complet?`<span class="dot v"></span>`:"")}
+            ${a ? boleta(c ? c.complet : true, false) : ""}
           </span>
         </div>
         <div class="nm ${a?"":"empty"}">${a?esc(a.n):"— triar —"}</div>
@@ -577,9 +590,7 @@ function pintarTria(){
     const c  = checkMeal(d.id, triaCtx.mealId);
     const ms = obert ? scoreMealFull(d.id, triaCtx.mealId) : null;
     return `<div class="dish ${cur===d.id?"sel":""}" onclick="triar('${d.id}')">
-      ${ms?`<span class="dot ${ms.lvl}" style="margin-top:6px"></span>`
-          :(c.complet?`<span class="dot v" style="margin-top:6px"></span>`
-                     :`<span class="dot" style="margin-top:6px;background:#e0ddd2"></span>`)}
+      ${boleta(c.complet, false, "margin-top:6px")}
       <div class="info">
         <div class="t">${esc(d.n)} ${d.src?`<span class="tag">${esc(d.src)}</span>`:""}</div>
         <div class="ing">${esc(ingList(d.i))}</div>
@@ -750,8 +761,7 @@ function obrirDia(ds){
       ${(()=>{ const sp=supervisioDe(day,m.id); const sx=sp?SUPERVISIO.find(x=>x.id===sp):null;
          return sx?`<div class="xs" style="margin-top:2px"><span class="sup ${sx.omplert}"></span>
            <span class="muted"> ${esc(sx.n.toLowerCase())}</span></div>`:""; })()}</td>
-      <td style="width:34px">${ms?`<span class="dot ${ms.lvl}"></span>`
-        :(c&&c.complet?`<span class="dot v"></span>`:"")}</td></tr>`;
+      <td style="width:34px">${a ? boleta(c ? c.complet : true, false) : ""}</td></tr>`;
     if(m.id==="dinar"||m.id==="sopar"){
       const p = dishById(day.postres[m.id]);
       if(p) h += `<tr><td class="xs muted">postres</td><td class="small">${esc(p.n)}</td><td></td></tr>`;
@@ -1207,9 +1217,7 @@ function viewPlats(){
       const f = (mealRef==="dinar"||mealRef==="sopar") ? faltaApat(d.i, mealRef) : checkMeal(d.id, mealRef);
       const ms = obert ? scoreMealFull(d.id, mealRef) : null;
       return `<div class="dish" style="cursor:default">
-        ${ms?`<span class="dot ${ms.lvl}" style="margin-top:6px"></span>`
-            :(f.complet?`<span class="dot v" style="margin-top:6px"></span>`
-                       :`<span class="dot" style="margin-top:6px;background:#e0ddd2"></span>`)}
+        ${boleta(f.complet, false, "margin-top:6px")}
         <div class="info">
           <div class="t">${esc(d.n)}
             ${d.base?"":'<span class="tag">afegit</span>'}
@@ -1412,7 +1420,16 @@ function seccioRacions(){
     intercanviables entre ells, i quan ella adapta un àpat l'aplicatiu li proposa aquestes
     quantitats. <b>Canviar un número aquí afecta tots els plats i tots els suggeriments alhora.</b>
     Les quantitats marcades com a <i>deduïda</i> no surten literalment de les guies: les vaig
-    calcular per equivalència i són les primeres a revisar.</div>`;
+    calcular per equivalència i són les primeres a revisar.</div>
+    <div class="avis" style="margin-bottom:14px">
+      <h3>Els canvis van sempre cap endavant</h3>
+      <div class="small" style="color:#8a6410">
+        Un canvi fet avui <b>s'aplica a partir de demà</b>, perquè un àpat que ella ja
+        s'ha menjat no li ha de canviar de valoració a mitja tarda.
+        Els dies que <b>ja has validat conserven</b> les quantitats que hi havia quan els
+        vas validar. Els que encara no, i els futurs, s'adapten sols.
+        Cada canvi queda anotat al <b>Registre de canvis</b>.</div>
+    </div>`;
   for(const [grup, d] of Object.entries(R)){
     h += `<div style="border:1px solid var(--linia);border-radius:12px;padding:14px;margin-bottom:12px">
       <div class="spread"><b style="font-size:15px">${esc(d.n)}</b>
@@ -1456,12 +1473,19 @@ function desarRacions(grup){
   if(!Object.keys(canvis.aliments).length && canvis.perApat==null) delete S.racions[grup];
   else S.racions[grup] = canvis;
   apuntarCanvi("Ha canviat les quantitats del grup «"+R.n+"»");
+  /* Al registre datat: és el que permet que un dia ja validat conservi
+     la valoració que tenia i que el canvi no entri fins demà. */
+  apuntarRacions();
   tocarConfig(); render();
+  alert("Desat. El canvi s'aplicarà a partir de demà.\n\n"+
+        "Els dies que ja has validat conserven la valoració que tenien; "+
+        "els que encara no, i els futurs, s'adapten sols.");
 }
 function restaurarRacions(grup){
   if(!confirm("Tornar les quantitats d'aquest grup a com venien?")) return;
   delete S.racions[grup];
   apuntarCanvi("Ha restaurat les quantitats originals del grup «"+RACIONS_BASE[grup].n+"»");
+  apuntarRacions();
   tocarConfig(); render();
 }
 
@@ -1578,9 +1602,7 @@ function viewHistorial(){
         <div class="xs muted">${dies.length} dies · ${nvS} validats · ${neS} equilibrats</div></div>
       <div class="row">${dies.map(ds=>{
         const d = w[ds];
-        return obert
-          ? `<span class="dot ${scoreDayFull(d).lvl}"></span>`
-          : (checkDay(d).complet?`<span class="dot v"></span>`:`<span class="dot" style="background:#e0ddd2"></span>`);
+        return boleta(checkDay(d).complet, false);
       }).join("")}<span class="muted" style="margin-left:6px">${ob?"▾":"▸"}</span></div></div>`;
     if(ob){
       h += `<div class="card pad" style="margin-top:6px"><table>
@@ -1596,8 +1618,7 @@ function viewHistorial(){
           h += `<td class="small">${d?esc(d.n):'<span class="muted">—</span>'}</td>`;
         }
         if(obert) h += `<td class="qty">${Math.round(scoreDayFull(day).kcal)}</td>`;
-        h += `<td>${obert?`<span class="dot ${scoreDayFull(day).lvl}"></span>`
-                        :(checkDay(day).complet?'<span class="dot v"></span>':"")}</td></tr>`;
+        h += `<td>${boleta(checkDay(day).complet, false)}</td></tr>`;
       }
       h += `</table><button class="btn ghost sm" style="margin-top:10px"
         onclick="anarASetmana('${dies[0]}')">Obrir aquesta setmana</button></div>`;

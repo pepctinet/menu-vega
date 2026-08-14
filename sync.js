@@ -259,6 +259,9 @@ const Sync = (() => {
         S.platsAmagats = r.platsAmagats || S.platsAmagats;
         S.editsIng     = r.editsIng     || S.editsIng;
         S.racions      = r.racions      || S.racions;
+        /* L'historic datat de racions: sense ell, un dia validat en un
+           aparell es valoraria diferent en un altre. */
+        S.racionsHist  = r.racionsHist  || S.racionsHist;
         S.canvis       = r.canvis       || S.canvis;
         S.target    = r.target !== undefined ? r.target : S.target;
         S.metaRev   = r.rev;
@@ -371,6 +374,7 @@ const Sync = (() => {
             custom:S.custom||[], customIng:S.customIng||{},
             editsPlats:S.editsPlats||{}, platsAmagats:S.platsAmagats||[],
             editsIng:S.editsIng||{}, racions:S.racions||{},
+            racionsHist:(S.racionsHist||[]).slice(-200),
             canvis:(S.canvis||[]).slice(0,300),
             missatges:(S.missatges||[]).slice(0,300),
             pesos:S.pesos||{}, diari:S.diari||{}, documents:(S.documents||[]).slice(0,200),

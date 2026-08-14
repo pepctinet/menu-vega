@@ -244,7 +244,14 @@ function loadState(){
   s.editsPlats  = s.editsPlats  || {};  // modificacions sobre els plats que porta el programa
   s.platsAmagats= s.platsAmagats|| [];  // plats retirats (no s'esborren, es poden recuperar)
   s.editsIng    = s.editsIng    || {};  // modificacions sobre aliments i receptes de base
-  s.racions     = s.racions     || {};  // modificacions sobre les racions
+  s.racions     = s.racions     || {};  // modificacions sobre les racions (les vigents ara)
+  s.racionsHist = s.racionsHist || [];  // històric datat: com quedaven després de cada canvi
+  /* Si ja hi havia racions canviades abans que existís l'històric, les
+     donem per vigents des de sempre. Si no, un dia validat d'abans es
+     valoraria amb les de base i canviaria de resultat. */
+  if(Object.keys(s.racions).length && !s.racionsHist.length)
+    s.racionsHist.push({quan:"1970-01-01T00:00:00.000Z", qui:"(abans del registre)",
+                        racions: JSON.parse(JSON.stringify(s.racions))});
   s.canvis      = s.canvis      || [];  // qui ha canviat què i quan
   s.missatges   = s.missatges   || [];  // taulell de missatges entre adults
   s.pesos       = s.pesos       || {};  // {data: {kg, hora, nota, u}}
@@ -459,17 +466,30 @@ function structure(items){
 
 /* Retorna {complet:bool, falten:[textos]} per a un àpat.
    "falten" es redacta sempre en positiu, com a suggeriment. */
-function checkMeal(dishId, mealId){
+/* Un àpat està complet o no. UN SOL CRITERI per a tothom.
+   Als àpats principals delega en faltaApat(), que surt de les racions;
+   així el triador de l'ordinador, el proposador i el mòbil diuen sempre
+   el mateix, i tot segueix la nutricionista quan canvia una quantitat.
+   Abans aquí hi havia grams escrits a mà (55 g d'hidrats, 200 g de
+   verdura) que no es movien encara que ella canviés la ració. */
+function checkMeal(dishId, mealId, quan){
   const d = dishById(dishId);
   if(!d) return {complet:false, falten:[], buit:true};
-  const s = structure(d.i);
+  return checkItems(d.i, mealId, quan);
+}
+function checkItems(items, mealId, quan){
+  if(mealId==="dinar" || mealId==="sopar"){
+    const r = faltaApat(items, mealId, quan);
+    return {complet:r.complet, falten:r.falten.map(x=>x.t), buit:false, detall:r.falten};
+  }
+  /* Els àpats petits no es mesuren en racions sinó per la recepta fixa
+     que dona la nutricionista (el batut, la fruita del berenar...).
+     Aquests números encara són aquí i s'han de fer editables amb la
+     pestanya Guia: és la segona meitat del punt 7.2. */
+  const s = structure(items);
   const f = [];
-  if(mealId==="dinar"||mealId==="sopar"){
-    if(!s.prots.length)        f.push("una font de proteïna");
-    if(s.g.verd < 200)         f.push("arribar als 200 g de verdura");
-    if(s.g.hc < 55)            f.push("l'aliment del grup dels hidrats");
-    if(s.greixos.length < 2)   f.push("un segon greix saludable");
-  } else if(mealId==="migmati"){
+  const d = {i:items};
+  if(mealId==="migmati"){
     if((d.i.llet_ame||0)   < 250) f.push("els 250 ml de beguda d'ametlla");
     if((d.i.iogurt_soja||0)< 120) f.push("el iogurt de soja");
     if((d.i.crema_ame||0)  < 25)  f.push("els 25 g de crema d'ametlles");
@@ -495,7 +515,8 @@ function dayItems(day){
   for(const m of ["dinar","sopar"]){ const p=dishById(day.postres[m]); if(p) add(p.i); }
   return all;
 }
-function checkDay(day){
+function checkDay(day, quan){
+  const q = quan!==undefined ? quan : momentDe(day);
   const items = dayItems(day);
   const s = structure(items);
   const f = [];
@@ -503,21 +524,27 @@ function checkDay(day){
   /* Els àpats fets fora no els podem valorar: si n'hi ha cap, el dia
      no es qualifica ni en positiu ni en negatiu. */
   const nFora = MEALS.filter(m => day.fora && day.fora[m.id]).length;
+  /* Una ració de verdura: també surt de les racions, no d'un 100 escrit
+     a mà. Si la nutricionista la canvia, això la segueix. */
+  const Rd = racions(q);
+  const gVerd = (Rd.verd && Rd.verd.aliments && Rd.verd.aliments.tomaquet
+                 && Rd.verd.aliments.tomaquet.g) || 100;
   if(fets < 5) f.push("planificar els "+MEALS.length+" àpats");
-  if(s.g.verd_c < 100 || s.g.verd_k < 100) f.push("verdura crua en un àpat i cuita en un altre");
-  if(fruitPieces(items) < 3) f.push("arribar a 3 racions de fruita");
+  if(s.g.verd_c < gVerd || s.g.verd_k < gVerd)
+    f.push("verdura crua en un àpat i cuita en un altre");
+  if(fruitPieces(items, q) < 3) f.push("arribar a 3 racions de fruita");
   const alt = postresAlternades(day);
   if(!alt.ok) f.push("alternar iogurt i fruita a les postres");
   return {complet: f.length===0 && fets===5 && nFora===0,
           falten:f, fets, nFora, valorable: nFora===0};
 }
-function fruitPieces(items){
-  let g=0;
-  for(const [k,v] of Object.entries(items)){
-    const x = ing(k);
-    if(x && x.cat==="fruita" && k!=="llimona") g += v;
-  }
-  return g/150;
+/* Racions de fruita. Cada fruita té la seva ració (una poma són 180 g i
+   un kiwi 90), o sigui que això ha de passar per racionsDe() i no per una
+   divisió entre 150 igual per a totes. */
+function fruitPieces(items, quan){
+  const sense = {};
+  for(const [k,v] of Object.entries(items||{})) if(k!=="llimona") sense[k]=v;
+  return racionsDe(sense, quan).total.fruita || 0;
 }
 function postresAlternades(day){
   const a = dishById(day.postres.dinar), b = dishById(day.postres.sopar);
@@ -980,11 +1007,61 @@ const RACIONS_BASE = {
   },
 };
 
-/* Les racions es poden editar (nutricionista). Les modificacions viuen a
-   S.racions i es fusionen sobre les de base. */
-function racions(){
+/* ---------------------------------------------------------------------
+   Les racions es poden editar (nutricionista) i el canvi va cap endavant,
+   mai enrere. Regla, decidida el 14 d'agost:
+
+     · Un dia VALIDAT es valora sempre amb les racions que hi havia quan
+       es va validar. Validar és el moment en què es revisen els àpats, i
+       tots els dies s'han de validar, siguin passats o no.
+     · Un dia SENSE validar es valora amb les vigents ara.
+     · Un canvi fet avui no entra fins demà. Si entrés el mateix dia, un
+       dinar que ella ja s'ha menjat i que li deia "Equilibrat" podria
+       passar a dir-li que hi faltava alguna cosa, que és exactament la
+       valoració retroactiva que evita tot l'aplicatiu.
+
+   Per fer-ho no es desa la taula sencera dins de cada dia: es desa
+   l'històric datat dels canvis i es resol per moment.
+   --------------------------------------------------------------------- */
+
+/* Desa al registre com queden les racions després d'un canvi. */
+function apuntarRacions(){
+  S.racionsHist = S.racionsHist || [];
+  S.racionsHist.push({quan:new Date().toISOString(),
+                      qui: quiSoc() || "aquest aparell",
+                      racions: JSON.parse(JSON.stringify(S.racions||{}))});
+  if(S.racionsHist.length > 200) S.racionsHist.splice(0, S.racionsHist.length-200);
+}
+
+/* Quines modificacions regien en un moment donat. */
+function racionsVigents(quan){
+  const h = S.racionsHist || [];
+  if(quan===undefined || quan===null || !h.length) return S.racions || {};
+  const t = new Date(quan).getTime();
+  if(isNaN(t)) return S.racions || {};
+  let r = null;
+  for(const e of h){
+    if(new Date(e.quan).getTime() <= t) r = e.racions;
+    else break;                      // l'històric va en ordre cronològic
+  }
+  return r || {};                    // abans del primer canvi: les de base
+}
+
+/* El moment amb què s'ha de valorar un dia. L'inici d'avui és el que
+   deixa fora els canvis fets avui mateix. */
+function momentDe(day){
+  return (day && day.validat) ? day.validat : TODAY.toISOString();
+}
+const MOMENT_ARA = () => TODAY.toISOString();
+/* Per defecte, tota valoració i tota equivalència es fan amb el moment
+   d'ara. racions() sense argument segueix donant les vigents de debò,
+   que és el que necessita la pantalla d'edicio. */
+const QUAN = q => (q===undefined || q===null) ? MOMENT_ARA() : q;
+
+/* Les racions vigents. Sense argument, les d'ara. */
+function racions(quan){
   const r = JSON.parse(JSON.stringify(RACIONS_BASE));
-  for(const [grup, canvis] of Object.entries(S.racions||{})){
+  for(const [grup, canvis] of Object.entries(racionsVigents(quan))){
     if(!r[grup]) r[grup] = {n:grup, perApat:1, aliments:{}};
     if(canvis.perApat!=null) r[grup].perApat = canvis.perApat;
     for(const [k,v] of Object.entries(canvis.aliments||{}))
@@ -994,27 +1071,27 @@ function racions(){
 }
 
 /* Grup d'equivalència d'un aliment (verd_c i verd_k compten com "verd") */
-function grupRacio(k){
-  const R = racions();
+function grupRacio(k, quan){
+  const R = racions(QUAN(quan));
   for(const [grup, d] of Object.entries(R)) if(d.aliments[k]) return grup;
   return null;
 }
 /* Grams que fan una ració d'aquest aliment */
-function gramsRacio(k){
-  const g = grupRacio(k); if(!g) return null;
-  return racions()[g].aliments[k].g;
+function gramsRacio(k, quan){
+  const g = grupRacio(k, quan); if(!g) return null;
+  return racions(QUAN(quan))[g].aliments[k].g;
 }
 /* Quantes racions són aquests grams */
-function comptaRacions(k, grams){
-  const g = gramsRacio(k);
+function comptaRacions(k, grams, quan){
+  const g = gramsRacio(k, quan);
   return g ? grams/g : 0;
 }
 /* Alternatives per canviar un aliment sense desquadrar l'àpat.
    Retorna [{k, n, grams, text, nota}] amb la quantitat ja calculada. */
-function equivalents(k, nRacions){
-  const grup = grupRacio(k); if(!grup) return [];
+function equivalents(k, nRacions, quan){
+  const grup = grupRacio(k, quan); if(!grup) return [];
   const n = nRacions || 1;
-  return Object.entries(racions()[grup].aliments)
+  return Object.entries(racions(QUAN(quan))[grup].aliments)
     .filter(([alt]) => alt!==k && ing(alt))
     .map(([alt,d]) => {
       const grams = Math.round(d.g*n);
@@ -1023,8 +1100,8 @@ function equivalents(k, nRacions){
     .sort((a,b)=>a.n.localeCompare(b.n));
 }
 /* Totes les opcions d'un grup, per construir un àpat element a element */
-function opcionsGrup(grup, nRacions){
-  const R = racions()[grup]; if(!R) return [];
+function opcionsGrup(grup, nRacions, quan){
+  const R = racions(QUAN(quan))[grup]; if(!R) return [];
   const n = nRacions || 1;
   return Object.entries(R.aliments)
     .filter(([k]) => ing(k))
@@ -1036,12 +1113,14 @@ function opcionsGrup(grup, nRacions){
 }
 
 /* Recompte de racions d'un conjunt d'ingredients */
-function racionsDe(items){
-  const R = racions();
+function racionsDe(items, quan){
+  const R = racions(QUAN(quan));
   const total = {}; for(const g of Object.keys(R)) total[g] = 0;
   const perGrup = {};
   for(const [k,q] of Object.entries(items||{})){
-    const grup = grupRacio(k); if(!grup || !q) continue;
+    let grup = null;
+    for(const [g,d] of Object.entries(R)) if(d.aliments[k]){ grup = g; break; }
+    if(!grup || !q) continue;
     const n = q / R[grup].aliments[k].g;
     total[grup] += n;
     (perGrup[grup] = perGrup[grup] || []).push({k, racions:n});
@@ -1050,18 +1129,35 @@ function racionsDe(items){
 }
 
 /* Què li falta a un àpat principal, en racions i redactat en positiu.
-   És el que fa servir el mòbil per dir "equilibrat" o "hi falta ...". */
-function faltaApat(items, mealId){
-  const R = racions(), r = racionsDe(items).total;
+   Aquest és **el criteri únic** de si un àpat principal està complet:
+   el fan servir el mòbil, la llista de plats, el triador de l'ordinador,
+   el proposador i la cadena. Surt sempre de racions(), o sigui que quan
+   la nutricionista canvia una quantitat, tot es mou alhora. */
+function faltaApat(items, mealId, quan){
+  const q = QUAN(quan);
+  const R = racions(q), comptat = racionsDe(items, q), r = comptat.total;
   const f = [];
   const arrodoneix = x => Math.round(x*10)/10;
   if(mealId==="dinar" || mealId==="sopar"){
-    if(r.prot  < 0.85) f.push({grup:"prot",  t:"una font de proteïna",       falten:arrodoneix(1-r.prot)});
-    if(r.hc    < 0.85) f.push({grup:"hc",    t:"l'aliment dels hidrats",     falten:arrodoneix(1-r.hc)});
-    if(r.verd  < 1.85) f.push({grup:"verd",  t:"verdura fins a 200 g",       falten:arrodoneix(2-r.verd)});
-    const diferents = new Set((racionsDe(items).perGrup.greix||[])
+    const calProt = (R.prot&&R.prot.perApat)||1;
+    const calHc   = (R.hc&&R.hc.perApat)||1;
+    const calVerd = (R.verd&&R.verd.perApat)||2;
+    const calGrx  = (R.greix&&R.greix.perApat)||2;
+    /* El 0,85 dona un marge del 15% per no cridar l'atenció per una
+       diferència de pesatge. Els grams de "verdura fins a X" surten de
+       la ració, no d'un 200 escrit a mà. */
+    const gVerd = Math.round(calVerd * ((R.verd&&R.verd.aliments&&R.verd.aliments.tomaquet
+                    &&R.verd.aliments.tomaquet.g) || 100));
+    if(r.prot < calProt*0.85) f.push({grup:"prot", t:"una font de proteïna",
+                                      falten:arrodoneix(calProt-r.prot)});
+    if(r.hc   < calHc*0.85)   f.push({grup:"hc",   t:"l'aliment dels hidrats",
+                                      falten:arrodoneix(calHc-r.hc)});
+    if(r.verd < calVerd*0.925) f.push({grup:"verd", t:"verdura fins a "+gVerd+" g",
+                                      falten:arrodoneix(calVerd-r.verd)});
+    const diferents = new Set((comptat.perGrup.greix||[])
       .filter(x=>x.racions>=0.4).map(x=>x.k));
-    if(diferents.size < 2) f.push({grup:"greix", t:"un segon greix diferent", falten:1});
+    if(diferents.size < calGrx) f.push({grup:"greix", t:"un segon greix diferent",
+                                        falten:calGrx-diferents.size});
   }
   return {complet:f.length===0, falten:f, racions:r};
 }
@@ -1186,5 +1282,8 @@ if (typeof module !== "undefined") module.exports = {
   parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
   desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,
+  RACIONS_BASE, apuntarRacions, racionsVigents, momentDe, MOMENT_ARA,
+  checkItems, equivalents, opcionsGrup, comptaRacions, apatsFets,
+  SENSACIONS, SUPERVISIO, structure, DISHES, totsElsPlats,
   get S(){ return S; }, set S(v){ S = v; },
 };
