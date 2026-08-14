@@ -25,7 +25,10 @@
 <style>
 :root{
   --verd:#4a7c3f; --verd-clar:#eaf2e5; --verd-fosc:#2f5226;
-  --sorra:#f7f4ed; --paper:#fff; --text:#2c2c28; --gris:#8a8a80;
+  /* El fons va un punt més pujat que el paper a propòsit: les caixes
+     blanques de cada àpat han de destacar-hi. Si es torna a aclarir,
+     les caixes es fonen amb el fons i costa veure on acaba cadascuna. */
+  --sorra:#f0ebdf; --paper:#fff; --text:#2c2c28; --gris:#8a8a80;
   --linia:#e3dfd3; --suau:#fdfdfb;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
@@ -100,6 +103,12 @@ main{padding:14px 16px 0}
 .ings .sub{font-size:11.5px;color:var(--gris)}
 .postr{margin-top:10px;font-size:13.5px;color:var(--gris)}
 .postr b{color:var(--text)}
+/* Quan es poden canviar, les postres són un botó de debò: cal que es
+   vegi que allò es toca, no només que s'hi pot clicar. */
+button.postr{display:flex;align-items:center;gap:6px;width:100%;text-align:left;
+ border:1px solid var(--linia);background:var(--suau);border-radius:12px;
+ padding:10px 13px;min-height:44px}
+button.postr .fl{margin-left:auto;color:var(--gris);font-size:12px}
 .foratxt{margin-top:10px;font-size:15px;background:var(--suau);border:1px solid var(--linia);
  border-radius:11px;padding:10px 12px;white-space:pre-wrap}
 .macc{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
@@ -340,9 +349,14 @@ function pintar(){
         return `<div><span>${esc(x.n)}${x.nota?` <span class="sub">(${esc(x.nota)})</span>`:""}</span>
           <span class="q">${esc(qtyTxt(k,g))}</span></div>`;
       }).join("")+`</div>`;
+      /* Les postres es trien a part del plat: canviar el dinar no ha
+         d'obligar-la a refer les postres, ni al revés. */
       if(m.id==="dinar"||m.id==="sopar"){
         const p = dishById(day.postres[m.id]);
-        if(p) h += `<div class="postr">Postres: <b>${esc(p.n)}</b></div>`;
+        h += bloc
+          ? (p ? `<div class="postr">Postres: <b>${esc(p.n)}</b></div>` : "")
+          : `<button class="postr canvi" onclick="obrirPostres('${m.id}')">
+               Postres: <b>${p ? esc(p.n) : "triar-les"}</b> <span class="fl">▾</span></button>`;
       }
     }
 
@@ -592,6 +606,43 @@ function desarConstruit(){
      del catàleg: apatDelDia() el torna amb els ingredients a .i i
      racionsDe() en treu la proteïna i l'hidrat sense saber d'on vénen. */
   cadena(m); tocarDia(DS); tancarFull(); pintar(); anarA(m);
+}
+
+/* =====================================================================
+   POSTRES — es trien a part del plat
+   ---------------------------------------------------------------------
+   Només al dinar i al sopar. Es mostra la indicació d'alternar iogurt i
+   fruita perquè pugui decidir, però no se li diu mai que ho hagi fet
+   malament: si tria dues vegades el mateix, no passa res i no ho retreu.
+   ===================================================================== */
+function obrirPostres(mealId){
+  canviCtx = {meal:mealId, mode:"postres", cons:null};
+  const m = MEALS.find(x=>x.id===mealId);
+  const day = dayData(DS);
+  const actual = day.postres[mealId] || "";
+  const altre = mealId==="dinar" ? "sopar" : "dinar";
+  const pAltre = dishById(day.postres[altre]);
+  obrirFull(`<div class="grip"></div>
+    <div class="shtit"><h2>Postres del ${esc(m.n.toLowerCase())}</h2></div>
+    <div style="font-size:12.5px;color:var(--gris);margin:4px 0 10px">
+      La indicació és anar alternant el iogurt i la fruita entre el dinar i el sopar.
+      ${pAltre ? `Al ${esc(altre)} hi tens <b>${esc(pAltre.n)}</b>.` : ""}</div>`,
+    POSTRES.map(p=>`<div class="opt ${actual===p.id?"sel":""}"
+        onclick="triarPostres('${p.id}')">
+        <div class="optrow"><div><div class="t">${esc(p.n)}</div></div>
+        <div class="q">${esc(ingList(p.i))}</div></div></div>`).join("")+
+    (actual?`<button class="btn g" style="margin-top:9px" onclick="treurePostres()">
+       Sense postres</button>`:""));
+}
+function triarPostres(id){
+  const day = dayData(DS), m = canviCtx.meal;
+  day.postres[m] = id;
+  tocarDia(DS); tancarFull(); pintar(); anarA(m);
+}
+function treurePostres(){
+  const day = dayData(DS), m = canviCtx.meal;
+  delete day.postres[m];
+  tocarDia(DS); tancarFull(); pintar(); anarA(m);
 }
 
 /* =====================================================================

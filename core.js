@@ -731,17 +731,22 @@ function reprogramarCadena(ds, mealId, opcions){
       /* Llavor de rotació: el dia de la setmana del dia de destí. Manté
          la varietat sense fer-ho aleatori, que faria impossible provar-ho. */
       const i = (dt.getDay()+6)%7;
-      day.meals[t.mealId] = cand[i % cand.length].id;
-      ajustarDia(day, i, P, bloquejat);               // condició 7
 
-      /* ajustarDia() pot haver tornat a posar-hi allò que volíem evitar:
-         la seva passada 1 canvia el sopar sense saber res de la cadena.
-         Si ha passat, l'àpat es queda com estava. */
-      const final = dishById(day.meals[t.mealId]);
-      if(!final || nutrientsClau(final.i).some(k => bloc.has(k))){
-        day.meals = abans;                            // condició 8
-        continue;
+      /* Provem els candidats un darrere l'altre, començant pel que toca
+         per rotació. Cal provar-los tots abans de rendir-se: ajustarDia()
+         no sap res de la cadena i la seva passada 1 pot tornar a posar
+         al sopar justament allò que volíem evitar. Que el primer candidat
+         no serveixi no vol dir que no n'hi hagi cap: la condició 8 parla
+         de quan NO N'HI HA CAP. */
+      let servit = false;
+      for(let k=0; k<cand.length && !servit; k++){
+        day.meals[t.mealId] = cand[(i+k) % cand.length].id;
+        ajustarDia(day, i, P, bloquejat);             // condició 7
+        const final = dishById(day.meals[t.mealId]);
+        if(final && !nutrientsClau(final.i).some(x => bloc.has(x))) servit = true;
+        else day.meals = Object.assign({}, abans);    // no ha anat: el següent
       }
+      if(!servit) continue;                           // condició 8
 
       for(const mid of PRINCIPALS){
         if(day.meals[mid] === abans[mid]) continue;
