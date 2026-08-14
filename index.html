@@ -825,12 +825,18 @@ function toggleHabit(ds, id){
 function validar(ds){
   const day = dayData(ds);
   day.validat = new Date().toISOString();
+  /* A partir d'ara aquest dia és una fotografia: es desa què hi havia
+     exactament, i deixa de dependre del catàleg. Editar un plat més
+     endavant ja no reescriurà què va menjar aquell dia. */
+  fotografiarDia(day);
   tocarDia(ds); render();
 }
 function desvalidar(ds){
-  if(!confirm("Vols reobrir aquest dia? Tornarà a ser editable des del mòbil.")) return;
+  if(!confirm("Vols reobrir aquest dia? Tornarà a ser editable des del mòbil,\n"+
+              "i tornarà a agafar les quantitats del catàleg d'ara.")) return;
   const day = dayData(ds);
   day.validat = null;
+  delete day.snap;                 // deixa de ser una fotografia
   tocarDia(ds); render();
 }
 
@@ -1203,7 +1209,11 @@ function viewPlats(){
       <input class="search" style="flex:1;min-width:200px;margin:0" placeholder="Cercar plat o ingredient…"
         value="${esc(cercaPlats)}" oninput="cercaPlats=this.value;render()">
       <button class="btn" onclick="cfgFrom(null)">+ Afegir un plat</button>
+      <button class="btn ghost" onclick="obrirActualitzacio()">Actualitzar als criteris nous</button>
     </div>
+    ${(()=>{ const p = previsioActualitzacio(); const n = p.filter(x=>x.canvis.length).length;
+      return n ? `<div class="small" style="color:#8a6410;margin-top:9px">
+        Hi ha <b>${n} plat${n===1?"":"s"}</b> que no quadren amb les quantitats d'ara.</div>` : ""; })()}
     <div class="chips" style="margin-top:10px">`+
     [["tots","Tots"]].concat(MEALS.map(m=>[m.id,m.n]))
       .map(([k,n])=>`<button class="chip ${filtrePlats===k?"on":""}"
@@ -1477,10 +1487,88 @@ function desarRacions(grup){
      la valoració que tenia i que el canvi no entri fins demà. */
   apuntarRacions();
   tocarConfig(); render();
-  alert("Desat. El canvi s'aplicarà a partir de demà.\n\n"+
-        "Els dies que ja has validat conserven la valoració que tenien; "+
-        "els que encara no, i els futurs, s'adapten sols.");
+  const prev = previsioActualitzacio(new Date().toISOString());
+  const nCanvis = prev.filter(x=>x.canvis.length).length;
+  let m = "Desat. El canvi s'aplicarà a partir de demà.\n\n"+
+          "Els dies que ja has validat conserven la valoració que tenien; "+
+          "els que encara no, i els futurs, s'adapten sols.";
+  if(nCanvis) m += "\n\nAmb aquestes quantitats hi ha "+nCanvis+" plat"+
+    (nCanvis===1?"":"s")+" del catàleg que es queden curts. "+
+    "Amb el botó «Actualitzar als criteris nous» es posen al dia de cop.";
+  alert(m);
+  if(nCanvis) obrirActualitzacio();
 }
+/* =====================================================================
+   ACTUALITZAR ELS PLATS ALS CRITERIS NOUS
+   ---------------------------------------------------------------------
+   Sempre s'ensenya què canviarà abans d'aplicar-ho: són les quantitats
+   que menjarà ella, no un format. Els dies ja validats porten la seva
+   fotografia i no els toca res d'això.
+   ===================================================================== */
+function obrirActualitzacio(){
+  const prev = previsioActualitzacio();
+  const ambCanvis = prev.filter(x=>x.canvis.length);
+  const nomesAvis = prev.filter(x=>!x.canvis.length && x.avisos.length);
+  if(!ambCanvis.length && !nomesAvis.length){
+    openModal(`<div class="mhead"><h3>Tot quadra</h3>
+      <button class="close" onclick="closeModal()">×</button></div>
+      <div class="mbody"><div class="small muted">
+      Tots els plats del catàleg compleixen les quantitats d'ara. No hi ha res a fer.</div>
+      <button class="btn" style="margin-top:12px" onclick="closeModal()">D'acord</button></div>`, true);
+    return;
+  }
+  const recuperats = ambCanvis.filter(x=>!x.abans && x.despres).length;
+  let h = `<div class="mhead"><div><h3>Actualitzar als criteris nous</h3>
+    <div class="small muted" style="margin-top:3px">
+      ${ambCanvis.length} plat${ambCanvis.length===1?"":"s"} a retocar${
+      recuperats?` · ${recuperats} tornarien a complir`:""}</div></div>
+    <button class="close" onclick="closeModal()">×</button></div>
+    <div class="mbody">
+    <div class="small muted" style="margin-bottom:12px">
+      Es reajusten les quantitats de cada grup fins a les racions que toquen.
+      <b>No s'hi afegeix cap aliment que no hi fos</b> i no es toquen ni les espècies
+      ni els dies que ja has validat. Revisa-ho abans d'aplicar-ho.</div>`;
+
+  if(ambCanvis.length){
+    h += `<table><tr><th>Plat</th><th>Què canvia</th><th style="width:90px">Resultat</th></tr>`;
+    for(const p of ambCanvis){
+      h += `<tr><td class="small"><b>${esc(p.n)}</b>
+        ${p.avisos.length?`<div class="xs" style="color:#8a6410">${p.avisos.map(esc).join(" · ")}</div>`:""}</td>
+        <td class="small">${p.canvis.map(c=>
+          `${esc(ing(c.k)?ing(c.k).n:c.k)} <span class="muted">${c.abans} → </span><b>${c.ara} g</b>`
+          ).join("<br>")}</td>
+        <td class="xs">${p.abans?`<span class="muted">ja complia</span>`
+          :p.despres?`<span class="eq">passa a complir</span>`
+          :`<span style="color:#8a6410">encara curt</span>`}</td></tr>`;
+    }
+    h += `</table>`;
+  }
+  if(nomesAvis.length){
+    h += `<div class="avis" style="margin-top:14px"><h3>Aquests no es poden arreglar sols</h3>
+      <div class="small" style="color:#8a6410">Els falta un aliment que no hi és, i
+      afegir-l'hi és una decisió de la nutricionista, no una regla de tres.</div>`;
+    for(const p of nomesAvis)
+      h += `<div class="lin"><b>${esc(p.n)}</b>
+        <span class="small muted">${p.avisos.map(esc).join(" · ")}</span></div>`;
+    h += `</div>`;
+  }
+  h += `<div class="row" style="gap:8px;margin-top:16px">
+      ${ambCanvis.length?`<button class="btn" onclick="ferActualitzacio()">
+        Aplicar-ho als ${ambCanvis.length} plats</button>`:""}
+      <button class="btn ghost" onclick="closeModal()">Ara no</button>
+    </div></div>`;
+  openModal(h);
+}
+function ferActualitzacio(){
+  const prev = previsioActualitzacio();
+  const n = aplicarActualitzacio(prev);
+  apuntarCanvi("Ha actualitzat "+n+" plats a les quantitats per ració vigents");
+  tocarConfig(); closeModal(); render();
+  alert(n+" plat"+(n===1?"":"s")+" actualitzat"+(n===1?"":"s")+".\n\n"+
+        "Els dies que ja tens validats no han canviat: cadascun conserva "+
+        "la fotografia del que hi havia.");
+}
+
 function restaurarRacions(grup){
   if(!confirm("Tornar les quantitats d'aquest grup a com venien?")) return;
   delete S.racions[grup];

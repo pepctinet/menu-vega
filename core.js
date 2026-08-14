@@ -397,7 +397,44 @@ const supervisioDe = (day, mealId) => (day && day.supervisio) ? day.supervisio[m
    L'àpat fet fora no es valora: no en sabem les quantitats i no té cap
    sentit dir-li que li falta res d'un plat que ja s'ha menjat.
    --------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------
+   Un dia validat és una FOTOGRAFIA, no una consulta.
+   En validar-lo se li desa dins què hi havia exactament: el nom i les
+   quantitats de cada àpat. A partir d'aquell moment deixa de dependre
+   del catàleg.
+
+   Per què: un dia guarda `dinar:"d_patata_tofu"`, no el contingut. Sense
+   la fotografia, editar aquell plat avui reescrivia què va menjar fa
+   quatre dies i li podia canviar la valoració. Amb el botó d'actualitzar
+   tots els plats de cop, això hauria reescrit l'historial sencer que ha
+   de veure la nutricionista.
+   --------------------------------------------------------------------- */
+function fotografiarDia(day){
+  if(!day) return null;
+  const apats = {};
+  for(const m of MEALS){
+    const a = apatDelDiaViu(day, m.id);
+    if(a) apats[m.id] = JSON.parse(JSON.stringify(a));
+  }
+  const postres = {};
+  for(const m of ["dinar","sopar"]){
+    const p = dishById(day.postres && day.postres[m]);
+    if(p) postres[m] = {id:p.id, n:p.n, i:JSON.parse(JSON.stringify(p.i))};
+  }
+  day.snap = {apats, postres, quan:new Date().toISOString()};
+  return day.snap;
+}
+const teFotografia = day => !!(day && day.validat && day.snap && day.snap.apats);
+
 function apatDelDia(day, mealId){
+  if(!day) return null;
+  if(teFotografia(day))
+    return day.snap.apats[mealId] ? Object.assign({}, day.snap.apats[mealId]) : null;
+  return apatDelDiaViu(day, mealId);
+}
+/* El mateix, però mirant sempre el catàleg d'ara. La fa servir la
+   fotografia i la pantalla de reobrir un dia. */
+function apatDelDiaViu(day, mealId){
   if(!day) return null;
   if(day.fora && day.fora[mealId]){
     const f = day.fora[mealId];
@@ -512,7 +549,10 @@ function dayItems(day){
   const all = {};
   const add = it => { for(const [k,g] of Object.entries(it||{})) all[k]=(all[k]||0)+g; };
   for(const m of MEALS){ const a = apatDelDia(day, m.id); if(a) add(a.i); }
-  for(const m of ["dinar","sopar"]){ const p=dishById(day.postres[m]); if(p) add(p.i); }
+  for(const m of ["dinar","sopar"]){
+    const p = teFotografia(day) ? (day.snap.postres||{})[m] : dishById(day.postres[m]);
+    if(p) add(p.i);
+  }
   return all;
 }
 function checkDay(day, quan){
@@ -547,7 +587,9 @@ function fruitPieces(items, quan){
   return racionsDe(sense, quan).total.fruita || 0;
 }
 function postresAlternades(day){
-  const a = dishById(day.postres.dinar), b = dishById(day.postres.sopar);
+  const snap = teFotografia(day) ? (day.snap.postres||{}) : null;
+  const a = snap ? snap.dinar : dishById(day.postres.dinar);
+  const b = snap ? snap.sopar : dishById(day.postres.sopar);
   if(!a||!b) return {ok:false, txt:"sense definir"};
   const ia = a.id==="p_iogurt", ib = b.id==="p_iogurt";
   return {ok: ia!==ib, txt:(ia?"iogurt":"fruita")+" / "+(ib?"iogurt":"fruita")};
@@ -1163,6 +1205,104 @@ function faltaApat(items, mealId, quan){
 }
 
 /* =====================================================================
+   11bis. ACTUALITZAR ELS PLATS ALS CRITERIS NOUS
+   ---------------------------------------------------------------------
+   Quan la nutricionista canvia una ració, els plats del catàleg es queden
+   amb les quantitats velles. Això els torna a quadrar: reescala cada grup
+   fins a les racions que toquen, sense inventar-se cap aliment nou.
+
+   El que NO fa, a propòsit:
+     · no toca els aliments que no són de cap grup (all, sal, espècies)
+     · no afegeix un greix que no hi era: si a un plat només n'hi ha un i
+       la indicació en demana dos, ho reporta i no s'ho empesca
+     · no toca els dies ja validats, que porten la seva fotografia
+   Sempre s'ensenya què canviarà abans d'aplicar-ho.
+   --------------------------------------------------------------------- */
+
+/* Arrodoniment amable: de 5 en 5 a partir de 50 g, i d'1 en 1 per sota. */
+function arrodonirQty(g){
+  if(g >= 50) return Math.round(g/5)*5;
+  return Math.max(1, Math.round(g));
+}
+
+/* Com quedaria aquest plat amb les racions vigents.
+   Retorna {i, canvis:[{k, abans, ara}], avisos:[text]} */
+function recalcularPlat(dish, mealId, quan){
+  const R = racions(QUAN(quan));
+  const nous = Object.assign({}, dish.i);
+  const avisos = [];
+  const perGrup = {};
+  for(const [k,g] of Object.entries(dish.i)){
+    for(const [grup,d] of Object.entries(R)) if(d.aliments[k]){
+      (perGrup[grup] = perGrup[grup] || []).push(k); break;
+    }
+  }
+  /* Només es toca un grup si es queda CURT. Un plat que ja compleix no
+     s'ha de retocar per quadrar-lo al decimal: si té 2,1 racions de
+     verdura quan en calen 2, això ja està bé i moure-ho només seria
+     soroll a la previsió i quantitats rares al plat. Els llindars són
+     els mateixos que fa servir faltaApat(). */
+  const LLINDAR = {prot:0.85, hc:0.85, verd:0.925};
+  for(const grup of ["prot","hc","verd"]){
+    const ks = perGrup[grup]; if(!ks || !ks.length) continue;
+    const cal = (R[grup] && R[grup].perApat) || 1;
+    let ara = 0;
+    for(const k of ks) ara += nous[k] / R[grup].aliments[k].g;
+    if(!ara) continue;
+    if(ara >= cal * LLINDAR[grup]) continue;        // ja compleix: no s'hi toca
+    const factor = cal / ara;
+    for(const k of ks) nous[k] = arrodonirQty(nous[k] * factor);
+  }
+  /* Els greixos no es sumen: la indicació demana N de DIFERENTS, cadascun
+     amb prou quantitat. Es puja el que es queda curt i prou. */
+  const gx = perGrup.greix || [];
+  const calGx = (R.greix && R.greix.perApat) || 2;
+  for(const k of gx){
+    const r = nous[k] / R.greix.aliments[k].g;
+    if(r < 0.4) nous[k] = arrodonirQty(R.greix.aliments[k].g * 0.5);
+  }
+  if(gx.length < calGx && (mealId==="dinar"||mealId==="sopar"))
+    avisos.push("només hi ha "+gx.length+" greix"+(gx.length===1?"":"os")+
+                " i la indicació en demana "+calGx+": cal afegir-n'hi un a mà");
+
+  const canvis = [];
+  for(const [k,g] of Object.entries(nous))
+    if(g !== dish.i[k]) canvis.push({k, abans:dish.i[k], ara:g});
+  return {i:nous, canvis, avisos};
+}
+
+/* Tots els plats que canviarien, sense tocar res. És el que s'ensenya
+   abans d'aplicar. */
+function previsioActualitzacio(quan){
+  const out = [];
+  for(const d of DISHES()){
+    const mealId = d.m.includes("dinar") ? "dinar"
+                 : d.m.includes("sopar") ? "sopar" : null;
+    if(!mealId) continue;                    // els àpats petits, a la part b
+    const r = recalcularPlat(d, mealId, quan);
+    const abans = checkMeal(d.id, mealId, quan).complet;
+    if(!r.canvis.length && !r.avisos.length) continue;
+    const despres = checkItems(r.i, mealId, quan).complet;
+    out.push({id:d.id, n:d.n, mealId, canvis:r.canvis, avisos:r.avisos,
+              i:r.i, abans, despres});
+  }
+  return out;
+}
+
+/* Aplica el que s'acaba d'ensenyar. Torna quants plats ha tocat. */
+function aplicarActualitzacio(previsio){
+  let n = 0;
+  for(const p of previsio){
+    if(!p.canvis.length) continue;
+    const base = dishById(p.id); if(!base) continue;
+    S.editsPlats = S.editsPlats || {};
+    S.editsPlats[p.id] = Object.assign({}, S.editsPlats[p.id], {i:p.i});
+    n++;
+  }
+  return n;
+}
+
+/* =====================================================================
    12. TAULELL DE MISSATGES
    ---------------------------------------------------------------------
    Entre els adults que fan el seguiment: tu, la nutricionista i la
@@ -1283,6 +1423,8 @@ if (typeof module !== "undefined") module.exports = {
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
   desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,
   RACIONS_BASE, apuntarRacions, racionsVigents, momentDe, MOMENT_ARA,
+  fotografiarDia, teFotografia, apatDelDiaViu, recalcularPlat,
+  previsioActualitzacio, aplicarActualitzacio, arrodonirQty,
   checkItems, equivalents, opcionsGrup, comptaRacions, apatsFets,
   SENSACIONS, SUPERVISIO, structure, DISHES, totsElsPlats,
   get S(){ return S; }, set S(v){ S = v; },

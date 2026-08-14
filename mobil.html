@@ -471,21 +471,34 @@ function modeCanvi(mode){
 }
 
 /* --- a) suggeriments de plat sencer --- */
+/* Per sota d'aquests plats no s'amaga res: quedar-se sense on triar és
+   pitjor que veure'n algun d'imperfecte. Si s'hi arriba, és senyal que el
+   catàleg s'ha de posar al dia des de l'ordinador, i allà ja hi surt l'avís. */
+const MINIM_PLATS = 3;
+
 function htmlPlats(q){
   q = (q||"").toLowerCase().trim();
   const mealId = canviCtx.meal;
   const day = dayData(DS);
   const actual = day.meals[mealId];
   let list = DISHES().filter(d=>d.m.includes(mealId));
+
+  /* Només se li ofereixen els plats que compleixen les indicacions. No es
+     marquen els altres com a dolents: senzillament no hi són. El plat que
+     ja té posat es queda sempre, encara que hagi deixat de complir, perquè
+     ha de poder veure què hi ha ara. */
+  const compleix = d => checkMeal(d.id, mealId).complet;
+  const bons = list.filter(d => compleix(d) || d.id===actual);
+  if(bons.length >= MINIM_PLATS) list = bons;
+
   if(q) list = list.filter(d=>d.n.toLowerCase().includes(q) ||
       Object.keys(d.i).some(k=>ing(k) && ing(k).n.toLowerCase().includes(q)));
   return `<input class="cerca" id="cercaPlat" placeholder="Cercar…" value="${esc(q)}">`+
-    (list.length ? list.map(d=>{
-      const f = (mealId==="dinar"||mealId==="sopar") ? faltaApat(d.i, mealId) : checkMeal(d.id, mealId);
-      return `<div class="opt ${actual===d.id?"sel":""}" onclick="triarPlat('${d.id}')">
-        <div class="t">${esc(d.n)}${f.complet?' <span style="color:var(--verd);font-size:12.5px">· equilibrat</span>':""}</div>
-        <div class="s">${esc(ingList(d.i))}</div></div>`;
-    }).join("") : `<div class="buit">Cap plat amb aquest nom.<br>Prova de muntar-lo tu.</div>`);
+    (list.length ? list.map(d=>
+      `<div class="opt ${actual===d.id?"sel":""}" onclick="triarPlat('${d.id}')">
+        <div class="t">${esc(d.n)}</div>
+        <div class="s">${esc(ingList(d.i))}</div></div>`
+    ).join("") : `<div class="buit">Cap plat amb aquest nom.<br>Prova de muntar-lo tu.</div>`);
 }
 function triarPlat(id){
   const day = dayData(DS), m = canviCtx.meal;
