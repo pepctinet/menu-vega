@@ -1042,6 +1042,10 @@ function reprogramarCadena(ds, mealId, opcions){
 /* Desfà un canvi automàtic i esborra la marca. */
 function desferAuto(ds, mealId){
   const day = dayData(ds);
+  /* Un dia validat es congela (decisió 5). L'avís de reprogramacions
+     no caduca, i per tant continua ensenyant les d'un dia que després
+     s'ha validat; el botó no hi pot fer res. */
+  if(esValidat(day)) return false;
   if(!day.auto || !day.auto[mealId]) return false;
   const a = day.auto[mealId];
   if(a.abans) day.meals[mealId] = a.abans;
@@ -1621,15 +1625,51 @@ function escriureMissatge(text){
   if(S.missatges.length > 300) S.missatges.length = 300;
   return m;
 }
-function esborrarMissatge(id){
-  S.missatges = (S.missatges||[]).filter(m=>m.id!==id);
+/* =====================================================================
+   ESBORRATS AMB LÀPIDA
+   ---------------------------------------------------------------------
+   Esborrar traient l'element de la llista no funciona quan hi ha més
+   d'un aparell. L'altre encara el té, i com que fusionar només afegeix
+   el que li falta, el torna a pujar: l'element ressuscita.
+
+   Per això no s'esborra: es marca com a esborrat i la marca es
+   sincronitza com qualsevol altra dada. Les pantalles filtren els
+   marcats; la fusió, com que compara marques de temps, veu que
+   l'esborrat és més nou que la còpia de l'altre aparell i mana.
+
+   La làpida ocupa quatre camps i es queda. És el preu de poder esborrar
+   de debò, i és molt més barat que perdre o duplicar dades.
+   --------------------------------------------------------------------- */
+const esborrat = x => !!(x && x.esborrat);
+function lapida(id){
+  return {id, esborrat:true, u:Date.now(), qui:quiSoc()||"aquest aparell"};
 }
+
+function esborrarMissatge(id){
+  const l = S.missatges || (S.missatges = []);
+  const i = l.findIndex(m=>m.id===id);
+  if(i<0) return;
+  l[i] = lapida(id);
+}
+/* Els que s'han d'ensenyar: tot menys les làpides. */
+const missatgesVius = () => (S.missatges||[]).filter(m=>!esborrat(m));
+const documentsVius = () => (S.documents||[]).filter(d=>!esborrat(d));
+const pesosVius = () => {
+  const out = {};
+  for(const [ds,p] of Object.entries(S.pesos||{})) if(!esborrat(p)) out[ds] = p;
+  return out;
+};
+const diariViu = () => {
+  const out = {};
+  for(const [ds,v] of Object.entries(S.diari||{})) if(!esborrat(v)) out[ds] = v;
+  return out;
+};
 /* Marca com a llegits tots els que no ha escrit un mateix. Retorna
    quants n'ha marcat, per saber si cal desar. */
 function marcarLlegits(){
   const jo = quiSoc(); if(!jo) return 0;
   let n = 0;
-  for(const m of S.missatges||[]){
+  for(const m of missatgesVius()){
     m.llegits = m.llegits || {};
     if(m.qui!==jo && !m.llegits[jo]){ m.llegits[jo] = new Date().toISOString(); n++; }
   }
@@ -1637,7 +1677,7 @@ function marcarLlegits(){
 }
 function missatgesSenseLlegir(){
   const jo = quiSoc(); if(!jo) return 0;
-  return (S.missatges||[]).filter(m=>m.qui!==jo && !(m.llegits||{})[jo]).length;
+  return missatgesVius().filter(m=>m.qui!==jo && !(m.llegits||{})[jo]).length;
 }
 
 /* =====================================================================
@@ -1660,34 +1700,39 @@ function desarPes(dataStr, kg, extra){
   });
   return true;
 }
-function treurePes(dataStr){ delete S.pesos[dataStr]; }
+function treurePes(dataStr){ S.pesos[dataStr] = lapida(dataStr); }
 
 /* Observacions del dia sense pesada. Van a part perquè no tots els dies
    es pesa, i les notes tenen valor per elles mateixes. */
 function desarNotaDia(dataStr, text){
   const t = (text||"").trim();
-  if(!t) delete S.diari[dataStr];
+  if(!t) S.diari[dataStr] = lapida(dataStr);
   else S.diari[dataStr] = {text:t, u:Date.now()};
 }
 function notaDia(dataStr){
-  return (S.diari[dataStr] && S.diari[dataStr].text) || "";
+  const v = S.diari[dataStr];
+  return (v && !esborrat(v) && v.text) || "";
 }
 /* Totes les entrades del diari, amb el pes del dia si n'hi ha */
 function diariComplet(desde, fins){
-  const dies = new Set([...Object.keys(S.diari||{}), ...Object.keys(S.pesos||{})]);
+  const D = diariViu(), P = pesosVius();
+  const dies = new Set([...Object.keys(D), ...Object.keys(P)]);
   return [...dies]
     .filter(ds => (!desde || ds>=iso(desde)) && (!fins || ds<=iso(fins)))
     .sort().reverse()
     .map(ds => ({ds, d:parseDay(ds),
-                 text:(S.diari[ds]||{}).text || "",
-                 pes:(S.pesos[ds]||{}).kg || null,
-                 hora:(S.pesos[ds]||{}).hora || "",
-                 notaPes:(S.pesos[ds]||{}).nota || ""}));
+                 text:(D[ds]||{}).text || "",
+                 pes:(P[ds]||{}).kg || null,
+                 hora:(P[ds]||{}).hora || "",
+                 notaPes:(P[ds]||{}).nota || ""}))
+    /* Un dia on només hi queda una làpida no ha de sortir com a entrada
+       buida: per a qui mira, allò està esborrat. */
+    .filter(x => x.text || x.pes !== null);
 }
 
 /* Sèrie ordenada de pesades dins d'un interval */
 function seriePes(desde, fins){
-  return Object.entries(S.pesos||{})
+  return Object.entries(pesosVius())
     .filter(([ds]) => (!desde || ds>=iso(desde)) && (!fins || ds<=iso(fins)))
     .map(([ds,p]) => ({ds, d:parseDay(ds), kg:p.kg, hora:p.hora, nota:p.nota, qui:p.qui}))
     .sort((a,b)=>a.ds.localeCompare(b.ds));
@@ -1737,6 +1782,8 @@ if (typeof module !== "undefined") module.exports = {
   HABITS_BASE, habits, totsElsHabits, nomHabit,
   APATS_FIXOS_BASE, apatsFixos, INDICACIONS_BASE, indicacions,
   loadState, saveState, nomesGuia, CAMPS_GUIA, KEY,
+  lapida, esborrat, missatgesVius, documentsVius, pesosVius, diariViu,
+  treurePes, desarNotaDia, notaDia, esborrarMissatge, diariComplet, seriePes,
   allIng, ing, DISHES, dishById, iso, monday, addDays,
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,

@@ -289,10 +289,10 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<script src="firebase-config.js?v=2026-08-15c"></script>
-<script src="core.js?v=2026-08-15c"></script>
-<script src="nutri.js?v=2026-08-15c"></script>
-<script src="sync.js?v=2026-08-15c"></script>
+<script src="firebase-config.js?v=2026-08-15d"></script>
+<script src="core.js?v=2026-08-15d"></script>
+<script src="nutri.js?v=2026-08-15d"></script>
+<script src="sync.js?v=2026-08-15d"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -687,12 +687,20 @@ function avisAutomatics(){
         Perquè no es repetissin la proteïna o l'hidrat d'un àpat que va canviar ella.
         Ella no ho ha vist: només veu el dia en curs.</div>`;
     for(const a of pend){
+      /* Un dia validat està congelat: desfer-hi res no és possible. La
+         línia s'hi queda igualment —és informació del que va passar amb
+         aquell menú— però sense el botó, que no podria fer la seva
+         feina i escriuria dins d'un dia tancat. */
+      const tancat = esValidat(dayData(a.ds));
       h += `<div class="lin">
         <b>${esc(diaCurt(a.ds))} · ${esc(nomApat(a.mealId).toLowerCase())}</b>
         <span class="small muted">ara hi ha ${esc(nomPlat(dayData(a.ds).meals[a.mealId]))}
           · abans ${esc(nomPlat(a.abans))} · ${esc(a.motiu)}</span>
-        <button class="btn ghost sm no-print" style="margin-left:auto"
-          onclick="desferCanviAuto('${escJs(a.ds)}','${escJs(a.mealId)}')">Desfer</button></div>`;
+        ${tancat
+          ? `<span class="tag" style="margin-left:auto">dia tancat</span>`
+          : `<button class="btn ghost sm no-print" style="margin-left:auto"
+              onclick="desferCanviAuto('${escJs(a.ds)}','${escJs(a.mealId)}')">Desfer</button>`}
+        </div>`;
     }
     h += `<div class="row no-print" style="margin-top:8px;gap:8px">
       <button class="btn ghost sm" onclick="desferTotsAuto()">Desfer-ho tot</button>
@@ -2130,7 +2138,7 @@ async function veureFoto(ds, mealId){
    ===================================================================== */
 function viewMissatges(){
   const jo = quiSoc();
-  const msgs = (S.missatges||[]).slice().sort((a,b)=>b.quan.localeCompare(a.quan));
+  const msgs = missatgesVius().slice().sort((a,b)=>b.quan.localeCompare(a.quan));
   let h = `<div class="sec-title"><h2>Taulell de missatges</h2>
     <span class="muted small">Entre tu, la nutricionista i la psicòloga · ella no hi té accés</span></div>`;
 
@@ -2235,7 +2243,9 @@ function treureMissatge(id){
   const m = (S.missatges||[]).find(x=>x.id===id);
   if(m && m.doc){
     Sync.esborrarDocument(m.doc).catch(()=>{});
-    S.documents = (S.documents||[]).filter(d=>d.id!==m.doc.id);
+    /* Làpida, no treure'l de la llista: si el traguéssim, l'altre aparell
+       encara el tindria i el tornaria a pujar. */
+    S.documents = (S.documents||[]).map(d => d.id===m.doc.id ? lapida(d.id) : d);
   }
   esborrarMissatge(id); tocarConfig(); render();
 }
@@ -2342,7 +2352,7 @@ function grafPes(serie){
 }
 
 function editarPes(ds){
-  const p = S.pesos[ds] || {};
+  const p = pesosVius()[ds] || {};
   openModal(`<div class="mhead"><div><h3>${p.kg?"Corregir la pesada":"Afegir una pesada"}</h3>
       <div class="small muted">Es pot posar qualsevol dia, també enrere</div></div>
     <button class="close" onclick="closeModal()">×</button></div><div class="mbody">

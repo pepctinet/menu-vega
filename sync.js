@@ -227,6 +227,11 @@ const Sync = (() => {
         est.rol = await llegirRol(u.uid);
         est.estat="connectat"; est.missatge="Sincronitzat"; onCanvi(est);
         escoltar();
+        /* Tot el que s'hagi acumulat sense sessio surt ara. Abans no
+           s'agendava res en connectar-se: els canvis fets sense connexio
+           s'hi quedaven fins que en feies un de nou. */
+        intentsFallits = 0;
+        if(pendents.size) programar();
       });
     }catch(e){
       clearTimeout(rellotge);
@@ -272,9 +277,16 @@ const Sync = (() => {
   }
 
   function fusionarDocuments(remots){
-    const ids = new Set((S.documents||[]).map(d=>d.id));
+    const local = S.documents || (S.documents = []);
+    const perId = {}; for(const d of local) perId[d.id] = d;
     let canviat = false;
-    for(const d of remots) if(!ids.has(d.id)){ (S.documents=S.documents||[]).push(d); canviat = true; }
+    for(const r of remots){
+      const l = perId[r.id];
+      if(!l){ local.push(r); canviat = true; continue; }
+      if(r.esborrat && !l.esborrat && (r.u||0) >= (l.u||0)){
+        local[local.indexOf(l)] = r; canviat = true;
+      }
+    }
     return canviat;
   }
 
@@ -375,6 +387,13 @@ const Sync = (() => {
 
   /* Unió per identificador. Si el mateix missatge arriba pels dos
      costats, es queden totes les marques de llegit de tots dos. */
+  /* Fusio per identificador amb lapides.
+     Abans hi havia una regla que deia: si un missatge local no arriba del
+     servidor i te mes de 60 segons, esborra'l. Servia per propagar els
+     esborrats, pero castigava l'innocent: un missatge escrit sense
+     connexio, o que encara no havia pujat, desapareixia tot sol al cap
+     d'un minut. Ara els esborrats viatgen com a lapides i l'abcencia no
+     vol dir res. */
   function fusionarMissatges(remots){
     const local = S.missatges || (S.missatges = []);
     const perId = {}; for(const m of local) perId[m.id] = m;
@@ -382,16 +401,17 @@ const Sync = (() => {
     for(const r of remots){
       const l = perId[r.id];
       if(!l){ local.push(r); canviat = true; continue; }
+      /* Una lapida mana sobre el contingut, vingui d'on vingui: guanya
+         la marca de temps mes recent. */
+      if(r.esborrat && !l.esborrat && (r.u||0) >= (l.u||0)){
+        local[local.indexOf(l)] = r; canviat = true; continue;
+      }
+      if(l.esborrat) continue;
       const abans = JSON.stringify(l.llegits||{});
       l.llegits = Object.assign({}, r.llegits, l.llegits);
       if(JSON.stringify(l.llegits)!==abans) canviat = true;
     }
-    /* els esborrats al servidor desapareixen també aquí */
-    const ids = new Set(remots.map(r=>r.id));
-    const abansN = local.length;
-    S.missatges = local.filter(m => ids.has(m.id) || (Date.now()-new Date(m.quan).getTime()) < 60000);
-    if(S.missatges.length!==abansN) canviat = true;
-    S.missatges.sort((a,b)=>b.quan.localeCompare(a.quan));
+    S.missatges.sort((a,b)=>String(b.quan||"").localeCompare(String(a.quan||"")));
     return canviat;
   }
   function fusionarDiari(remots){
@@ -422,19 +442,45 @@ const Sync = (() => {
     try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
   }
 
-  /* --- enviar canvis --- */
+  /* --- enviar canvis ---
+     La cua va per DIA, no per setmana. Enviant la setmana sencera,
+     aquest aparell hi tornava a posar la seva copia de tots els dies que
+     coneixia, inclosos els que no havia tocat. Si mentrestant l'altre
+     aparell n'havia canviat un, l'ultim que enviava el tornava enrere:
+     dades perdudes sense cap avis i sense cap conflicte visible.
+     Enviant nomes {dies: {<data>: ...}} amb merge, Firestore fusiona
+     aquella clau i deixa les germanes com estaven. */
   function marcar(k){ pendents.add(k); programar(); }
   function push(){
-    Object.keys(S.weeks).forEach(k=>pendents.add(k));
+    for(const setmana of Object.values(S.weeks||{}))
+      for(const ds of Object.keys(setmana)) pendents.add("dia:"+ds);
     pendents.add("__config__");
     programar();
   }
-  function pushSetmana(k){ pendents.add(k); programar(); }
+  function pushDia(ds){ pendents.add("dia:"+ds); programar(); }
+  /* Es conserva pel codi antic que encara crida amb la clau de setmana */
+  function pushSetmana(k){
+    const setmana = S.weeks[k];
+    if(setmana) for(const ds of Object.keys(setmana)) pendents.add("dia:"+ds);
+    programar();
+  }
   function pushConfig(){ pendents.add("__config__"); programar(); }
+
+  /* Quina revisio toca escriure. Es llegeix la que hi ha al servidor i
+     es puja una per sobre de la mes alta de les dues. Si no es pot
+     llegir (sense connexio, o el document encara no existeix) es tira
+     endavant amb la local, que es el que es feia sempre. */
+  async function seguentRevisio(ruta, local){
+    try{
+      const d = await dbf.doc("plans/"+PLA_ID+"/"+ruta).get();
+      const remota = (d.exists && d.data().rev) || 0;
+      return Math.max(remota, local||0) + 1;
+    }catch(e){ return (local||0) + 1; }
+  }
 
   async function enviarPrivat(){
     if(NOMES_GUIA) return;
-    S.privatRev = (S.privatRev||0)+1;
+    S.privatRev = await seguentRevisio("privat/seguiment", S.privatRev);
     await dbf.doc("plans/"+PLA_ID+"/privat/seguiment").set({
       canvis:(S.canvis||[]).slice(0,300),
       missatges:(S.missatges||[]).slice(0,300),
@@ -457,7 +503,13 @@ const Sync = (() => {
     try{
       for(const k of llista){
         if(k==="__config__"){
-          S.metaRev = (S.metaRev||0)+1;
+          /* La revisio es demana al servidor, no es calcula aqui.
+             Calculant-la en local, dos aparells que editessin alhora
+             escrivien la mateixa revisio: l'ultim guanyava i l'altre
+             ignorava els seus canvis, perque nomes accepta revisions
+             estrictament superiors. Ara sempre queda per sobre del que
+             hi ha de debò. */
+          S.metaRev = await seguentRevisio("config/general", S.metaRev);
           await dbf.doc("plans/"+PLA_ID+"/config/general").set({
             custom:S.custom||[], customIng:S.customIng||{},
             editsPlats:S.editsPlats||{}, platsAmagats:S.platsAmagats||[],
@@ -476,19 +528,38 @@ const Sync = (() => {
           /* El seguiment va al seu document, i nomes des d'un aparell
              d'adult. El mobil no arriba mai aqui: no crida pushConfig. */
           if(!NOMES_GUIA) await enviarPrivat();
-        } else {
-          const dies = S.weeks[k]; if(!dies) continue;
-          await dbf.doc("plans/"+PLA_ID+"/setmanes/"+k).set({
-            dies, actualitzat: firebase.firestore.FieldValue.serverTimestamp()
+        } else if(k.startsWith("dia:")){
+          const ds = k.slice(4);
+          const setmana = S.weeks[weekKey(parseDay(ds))];
+          const day = setmana && setmana[ds];
+          if(!day) continue;
+          await dbf.doc("plans/"+PLA_ID+"/setmanes/"+weekKey(parseDay(ds))).set({
+            dies: {[ds]: day},
+            actualitzat: firebase.firestore.FieldValue.serverTimestamp()
           }, {merge:true});
         }
       }
+      intentsFallits = 0;
       est.ultimaSync = new Date(); est.missatge="Sincronitzat"; onCanvi(est);
     }catch(e){
       console.warn("enviar:", e);
       llista.forEach(k=>pendents.add(k));
       est.missatge="Canvis pendents d'enviar"; onCanvi(est);
+      /* Abans es tornava a posar a la cua i s'acabava aqui: no hi havia
+         cap nou temporitzador, o sigui que els canvis s'hi quedaven fins
+         que passava alguna altra cosa. Ara es torna a provar tot sol,
+         esperant cada vegada una mica mes. */
+      reintentar();
     }
+  }
+
+  /* Reintent amb espera creixent: 2, 4, 8... fins a un minut. */
+  let intentsFallits = 0;
+  function reintentar(){
+    intentsFallits++;
+    const espera = Math.min(60000, 2000 * Math.pow(2, intentsFallits-1));
+    clearTimeout(temporitzador);
+    temporitzador = setTimeout(enviar, espera);
   }
 
   /* --- sessió --- */
@@ -616,7 +687,7 @@ const Sync = (() => {
             percentatge: bytes/LIMIT*100};
   }
 
-  return {est, init, login, logout, push, pushSetmana, pushConfig, marcar,
+  return {est, init, login, logout, push, pushDia, pushSetmana, pushConfig, marcar,
           pujarFoto, baixarFoto, esborrarFoto, espaiFotos, espaiDocs, espaiTotal, configurat,
           pujarDocument, baixarDocument, esborrarDocument};
 })();
@@ -630,7 +701,9 @@ function tocarDia(ds){
   const day = dayData(ds);
   day.u = Date.now();
   saveState(true);
-  if(typeof Sync!=="undefined") Sync.pushSetmana(weekKey(parseDay(ds)));
+  /* Nomes aquest dia, no la setmana sencera: si no, aquest aparell
+     tornava a enviar la seva copia de tots els altres dies. */
+  if(typeof Sync!=="undefined") Sync.pushDia(ds);
 }
 function tocarConfig(){
   saveState(true);
