@@ -264,12 +264,17 @@ const Sync = (() => {
         S.racionsHist  = r.racionsHist  || S.racionsHist;
         /* La resta de la guia: apats fixos, indicacions i habits. */
         S.apatsFixos       = r.apatsFixos       || S.apatsFixos;
+        /* L'historic datat dels apats petits: mateix motiu que el de les
+           racions. Sense ell, un esmorzar validat es valoraria diferent
+           en un altre aparell. */
+        S.apatsFixosHist   = r.apatsFixosHist   || S.apatsFixosHist;
         S.indicacions      = r.indicacions      || S.indicacions;
         S.indicacionsNoves = r.indicacionsNoves || S.indicacionsNoves;
         S.habitsEdit       = r.habitsEdit       || S.habitsEdit;
         S.habitsNous       = r.habitsNous       || S.habitsNous;
         S.canvis       = r.canvis       || S.canvis;
-        S.target    = r.target !== undefined ? r.target : S.target;
+        S.target     = r.target !== undefined ? r.target : S.target;
+        S.targetHist = r.targetHist || S.targetHist;
         S.metaRev   = r.rev;
         canviat = true;
       }
@@ -380,14 +385,18 @@ const Sync = (() => {
             custom:S.custom||[], customIng:S.customIng||{},
             editsPlats:S.editsPlats||{}, platsAmagats:S.platsAmagats||[],
             editsIng:S.editsIng||{}, racions:S.racions||{},
-            racionsHist:(S.racionsHist||[]).slice(-200),
+            /* Els historics ja venen retallats de core.js, i retallats de
+               manera que no perden el passat. Retallar-los una segona
+               vegada aqui si que el perdria. */
+            racionsHist:S.racionsHist||[],
+            apatsFixosHist:S.apatsFixosHist||[],
             apatsFixos:S.apatsFixos||{}, indicacions:S.indicacions||{},
             indicacionsNoves:S.indicacionsNoves||[],
             habitsEdit:S.habitsEdit||{}, habitsNous:S.habitsNous||[],
             canvis:(S.canvis||[]).slice(0,300),
             missatges:(S.missatges||[]).slice(0,300),
             pesos:S.pesos||{}, diari:S.diari||{}, documents:(S.documents||[]).slice(0,200),
-            target:S.target||null, rev:S.metaRev,
+            target:S.target||null, targetHist:S.targetHist||[], rev:S.metaRev,
             actualitzat: firebase.firestore.FieldValue.serverTimestamp()
           }, {merge:true});
         } else {
@@ -420,8 +429,12 @@ const Sync = (() => {
      respecta de sobres. */
   const refFoto = (ds, meal) => dbf.doc("plans/"+PLA_ID+"/fotos/"+ds+"_"+meal);
 
+  /* Retorna true nomes si el servidor ho ha confirmat. Si no hi ha sessio
+     llenca error en lloc de retornar null: qui crida marcava la foto com
+     a enviada sense mirar el retorn, i llavors ja no entrava mai a la cua
+     de reintents. Val mes petar aqui que no pas perdre-la en silenci. */
   async function pujarFoto(ds, meal, blob){
-    if(est.estat!=="connectat") return null;
+    if(est.estat!=="connectat") throw new Error("sense connexio");
     const b64 = await Fotos.aBase64(blob);
     await refFoto(ds, meal).set({
       imatge: b64, dia: ds, apat: meal, mida: blob.size,

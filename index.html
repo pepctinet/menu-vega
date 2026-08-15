@@ -289,10 +289,10 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<script src="firebase-config.js"></script>
-<script src="core.js"></script>
-<script src="nutri.js"></script>
-<script src="sync.js"></script>
+<script src="firebase-config.js?v=2026-08-15b"></script>
+<script src="core.js?v=2026-08-15b"></script>
+<script src="nutri.js?v=2026-08-15b"></script>
+<script src="sync.js?v=2026-08-15b"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -475,8 +475,8 @@ function viewSetmana(){
     for(const m of MEALS){
       const a = apatDelDia(day, m.id);
       const d = (a && a.tipus==="plat") ? dishById(a.id) : null;
-      const c = (a && a.valorable) ? faltaApat(a.i, m.id) : null;
-      const ms = (obert && d) ? scoreMealFull(d.id, m.id) : null;
+      const c = (a && a.valorable) ? checkItems(a.i, m.id, momentDe(day)) : null;
+      const ms = (obert && d) ? scoreMealFull(d.id, m.id, momentDe(day)) : null;
       const foto = day.fotos && day.fotos[m.id];
       const sens = day.sensacio && day.sensacio[m.id];
       const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
@@ -760,8 +760,8 @@ function obrirDia(ds){
   for(const m of MEALS){
     const a = apatDelDia(day, m.id);
     const d = (a && a.tipus==="plat") ? dishById(a.id) : null;
-    const c = (a && a.valorable) ? faltaApat(a.i, m.id) : null;
-    const ms = (obert&&d) ? scoreMealFull(d.id,m.id) : null;
+    const c = (a && a.valorable) ? checkItems(a.i, m.id, momentDe(day)) : null;
+    const ms = (obert&&d) ? scoreMealFull(d.id, m.id, momentDe(day)) : null;
     const sens = day.sensacio && day.sensacio[m.id];
     const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
     h += `<tr><td style="width:92px"><b>${m.n}</b><div class="xs muted">${m.h}</div></td>
@@ -770,7 +770,7 @@ function obrirDia(ds){
           ${a.lloc?" "+esc(a.lloc):""}</div>` : ""}
       ${a && a.tipus==="lliure" ? `<div class="xs"><span class="tag">adaptat per ella</span></div>` : ""}
       ${a && a.tipus!=="fora" ? `<div class="xs muted">${esc(ingList(a.i))}</div>` : ""}
-      ${c && c.falten.length ? `<div class="xs muted">Hi falta: ${c.falten.map(x=>esc(x.t)).join(" · ")}</div>` : ""}
+      ${c && c.falten.length ? `<div class="xs muted">Hi falta: ${c.falten.map(esc).join(" · ")}</div>` : ""}
       ${sd ? `<div class="xs" style="margin-top:2px"><span class="quad" style="background:${sd.color}"></span>
           <span class="muted"> s'hi ha sentit ${esc(sd.n.toLowerCase())}</span></div>` : ""}
       ${(()=>{ const sp=supervisioDe(day,m.id); const sx=sp?SUPERVISIO.find(x=>x.id===sp):null;
@@ -873,6 +873,10 @@ function editarObjectius(){
 function desarObjectius(){
   S.target = {kcal:+$("#t_kcal").value||DEF_TARGET.kcal, prot:+$("#t_prot").value||DEF_TARGET.prot,
               verd:+$("#t_verd").value||DEF_TARGET.verd, fruita:+$("#t_fru").value||DEF_TARGET.fruita};
+  apuntarCanvi("Ha canviat els objectius numèrics del dia");
+  /* Datat, com les racions: un dia ja validat es continua llegint amb els
+     objectius que tenia el dia que es va validar. */
+  apuntarTarget();
   tocarConfig(); closeModal(); render();
 }
 
@@ -1291,7 +1295,7 @@ function viewPlats(){
     </div><div class="dishlist" style="max-height:none">`;
   h += (list.length||listOff.length) ? list.concat(listOff).map(d=>{
       const mealRef = d.m.includes("sopar")?"sopar":d.m[0];
-      const f = (mealRef==="dinar"||mealRef==="sopar") ? faltaApat(d.i, mealRef) : checkMeal(d.id, mealRef);
+      const f = checkItems(d.i, mealRef);
       const ms = obert ? scoreMealFull(d.id, mealRef) : null;
       return `<div class="dish${d.amagat?" retirat":""}" style="cursor:default">
         ${boleta(f.complet, false, "margin-top:6px")}
@@ -2668,6 +2672,8 @@ function desarApatFix(mealId){
   S.apatsFixos[mealId] = c;
   apuntarCanvi("Ha canviat les quantitats de l'àpat «"+
     (MEALS.find(x=>x.id===mealId)||{n:mealId}).n+"»");
+  /* Com les racions: queda datat, entra demà i no toca els dies validats. */
+  apuntarApatsFixos();
   tocarConfig(); closeModal(); render();
 }
 

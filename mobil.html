@@ -232,9 +232,9 @@ textarea.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-
 
 <input type="file" accept="image/*" capture="environment" id="camera" style="display:none">
 
-<script src="firebase-config.js"></script>
-<script src="core.js"></script>
-<script src="sync.js"></script>
+<script src="firebase-config.js?v=2026-08-15b"></script>
+<script src="core.js?v=2026-08-15b"></script>
+<script src="sync.js?v=2026-08-15b"></script>
 <script>
 /* =====================================================================
    APLICATIU DE MÒBIL · només el dia en curs
@@ -311,8 +311,10 @@ function pintar(){
     const desplegat = (ara===m.id) || obertManual;
 
     if(!desplegat){
+      /* checkItems, no faltaApat: faltaApat només sap mirar el dinar i el
+         sopar i deia que un esmorzar buit estava complet. */
       const est = !a ? "" : a.tipus==="fora" ? "fora"
-                : (faltaApat(a.i, m.id).complet ? "ok" : "falta");
+                : (checkItems(a.i, m.id, momentDe(day)).complet ? "ok" : "falta");
       h += `<div class="meal plegat" id="meal-${m.id}">
         <div class="mh">
           <span class="hora">${m.h}</span>
@@ -345,15 +347,16 @@ function pintar(){
         <span class="marca fora">${a.lloc||"Fora"}</span>
         <div class="foratxt">${esc(a.n)}</div>`;
     } else {
-      const f = faltaApat(a.i, m.id);
+      /* Una sola API per a tots cinc àpats. Abans els àpats petits es
+         miraven amb faltaApat (que no els sap mirar) o amb checkMeal
+         (que necessita un plat del catàleg, i per tant no valorava mai
+         un àpat que s'hagués construït ella). */
+      const f = checkItems(a.i, m.id, momentDe(day));
       h += `<div class="plat">${esc(a.n)}</div>`;
-      if(m.id==="dinar"||m.id==="sopar"){
-        h += f.complet
-          ? `<span class="marca ok">${IC.check} Equilibrat</span>`
-          : `<span class="marca falta">Hi falta ${f.falten.map(x=>x.t).join(" i ")}</span>`;
-      } else {
-        const c = checkMeal(a.id||"", m.id);
-        if(a.tipus==="plat" && c.complet) h += `<span class="marca ok">${IC.check} Equilibrat</span>`;
+      if(f.complet){
+        h += `<span class="marca ok">${IC.check} Equilibrat</span>`;
+      } else if(m.id==="dinar"||m.id==="sopar"){
+        h += `<span class="marca falta">Hi falta ${esc(f.falten.join(" i "))}</span>`;
       }
       h += `<div class="ings">`+Object.entries(a.i).map(([k,g])=>{
         const x = ing(k); if(!x) return "";
@@ -574,11 +577,11 @@ function htmlConstructor(){
     h += `<button class="afegir" onclick="obrirTriaGrup('${g}')">+ afegir ${def.n.toLowerCase()}</button></div>`;
   }
 
-  const f = faltaApat(cons, mealId);
+  const f = checkItems(cons, mealId);
   h += `<div class="resum-cons">`;
   h += f.complet
     ? `<div class="marca ok" style="margin:0 0 10px">${IC.check} Equilibrat</div>`
-    : `<div class="marca falta" style="margin:0 0 10px">Hi falta ${f.falten.map(x=>x.t).join(" i ")}</div>`;
+    : `<div class="marca falta" style="margin:0 0 10px">Hi falta ${esc(f.falten.join(" i "))}</div>`;
   h += `<button class="btn" onclick="desarConstruit()" ${Object.keys(cons).length?"":"disabled"}>
       Fer servir aquest àpat</button></div>`;
   return h;
@@ -769,7 +772,11 @@ async function enviarFoto(ds, meal, blob){
   try{
     if(!blob) blob = await Fotos.llegir(ds, meal);
     if(!blob) return;
-    await Sync.pujarFoto(ds, meal, blob);
+    /* Només es marca com a pujada si el servidor ho confirma. Abans no es
+       mirava el retorn: sense connexió es marcava igualment i la foto ja
+       no tornava a entrar mai a reintentarFotos(). */
+    const confirmada = await Sync.pujarFoto(ds, meal, blob);
+    if(confirmada !== true) return;
     const day = dayData(ds);
     if(day.fotos[meal]){ day.fotos[meal].pujada = true; tocarDia(ds); }
     pintar();

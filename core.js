@@ -646,8 +646,10 @@ function checkItems(items, mealId, quan){
   const d = {i:items};
   {
     /* Els números surten d'apatsFixos(), o sigui de la Guia. Abans eren
-       aquí dins i no hi havia manera de canviar-los. */
-    const F = apatsFixos()[mealId] || {min:{}, cal:{}};
+       aquí dins i no hi havia manera de canviar-los.
+       Amb el moment: un canvi fet avui no pot canviar la valoració d'un
+       esmorzar que ella ja s'ha menjat. */
+    const F = apatsFixos(QUAN(quan))[mealId] || {min:{}, cal:{}};
     for(const [k,q] of Object.entries(F.cal||{}))
       if((d.i[k]||0) < q)
         f.push((ing(k)?ing(k).n.toLowerCase():k)+" ("+q+(ing(k)&&ing(k).ml?" ml":" g")+")");
@@ -885,7 +887,14 @@ function reprogramarCadena(ds, mealId, opcions){
 
   const P = {}; for(const m of MEALS) P[m.id] = platsBons(m.id);
   const quan = new Date().toISOString();
-  const canvis = [], fotografies = [];
+  const canvis = [];
+  /* Una sola fotografia per data, feta ABANS de tocar-hi res.
+     Abans se'n desava una a cada volta del bucle, i com que dinar i sopar
+     del mateix dia poden caure tots dos a la mateixa cadena (passa sempre
+     que l'origen és el sopar), la segona ja portava a dins el canvi fet a
+     la primera. En restaurar-les en ordre guanyava la segona i el mode
+     "només suggerir" deixava el dinar de l'endemà canviat de debò. */
+  const originals = new Map();
 
   enCadena = true;
   try{
@@ -915,6 +924,7 @@ function reprogramarCadena(ds, mealId, opcions){
       /* Fotografia del dia sencer: ajustarDia() pot moure també l'altre
          àpat principal, i el desfer ha de poder-ho tornar tot enrere. */
       const abans = Object.assign({}, day.meals);
+      if(!originals.has(t.ds)) originals.set(t.ds, Object.assign({}, day.meals));
       const altre = t.mealId==="dinar" ? day.meals.sopar : day.meals.dinar;
       const cand = P[t.mealId].filter(d =>
         d.id !== actual && d.id !== altre &&
@@ -950,7 +960,6 @@ function reprogramarCadena(ds, mealId, opcions){
                        ? "repetia "+nomsAliments(xoca)
                        : "ajust del dia després del canvi"});
       }
-      fotografies.push({ds:t.ds, meals:abans});
     }
   } finally { enCadena = false; }
 
@@ -960,7 +969,7 @@ function reprogramarCadena(ds, mealId, opcions){
      perquè ajustarDia() necessita veure el dia sencer, així que ara ho
      tornem tot a deixar exactament com estava. */
   if(!aplicar){
-    for(const f of fotografies) dayData(f.ds).meals = f.meals;
+    for(const [ds, meals] of originals) dayData(ds).meals = Object.assign({}, meals);
     return {canvis, dies, aplicat:false};
   }
 
@@ -1191,26 +1200,62 @@ const RACIONS_BASE = {
    --------------------------------------------------------------------- */
 
 /* Desa al registre com queden les racions després d'un canvi. */
+const MAX_HIST = 200;
+
+/* Retallar un històric datat sense perdre el passat.
+   Abans es llençaven les entrades velles i prou, i llavors un dia validat
+   més antic que la primera entrada conservada es tornava a valorar amb
+   les racions de base: la seva fotografia deixava de poder-se llegir.
+   Ara l'última entrada que sortiria es queda com a primera, marcada, i
+   com que cada entrada porta l'estat sencer (no la diferència) qualsevol
+   moment posterior es continua reconstruint exacte. */
+function retallarHist(h){
+  if(!Array.isArray(h) || h.length <= MAX_HIST) return h;
+  const arrossegada = Object.assign({}, h[h.length-MAX_HIST], {collapsada:true});
+  h.splice(0, h.length-MAX_HIST+1, arrossegada);
+  return h;
+}
+
+/* Com resoldre quin estat regia en un moment donat. Serveix per a
+   qualsevol històric datat: racions, àpats fixos... */
+function vigentEn(hist, quan, ara, camp){
+  const h = hist || [];
+  if(quan===undefined || quan===null || !h.length) return ara || {};
+  const t = new Date(quan).getTime();
+  if(isNaN(t)) return ara || {};
+  let r = null;
+  for(const e of h){
+    if(new Date(e.quan).getTime() <= t) r = e[camp];
+    else break;                      // l'històric va en ordre cronològic
+  }
+  return r || {};                    // abans del primer canvi: les de base
+}
+
 function apuntarRacions(){
   S.racionsHist = S.racionsHist || [];
   S.racionsHist.push({quan:new Date().toISOString(),
                       qui: quiSoc() || "aquest aparell",
                       racions: JSON.parse(JSON.stringify(S.racions||{}))});
-  if(S.racionsHist.length > 200) S.racionsHist.splice(0, S.racionsHist.length-200);
+  retallarHist(S.racionsHist);
 }
 
 /* Quines modificacions regien en un moment donat. */
 function racionsVigents(quan){
-  const h = S.racionsHist || [];
-  if(quan===undefined || quan===null || !h.length) return S.racions || {};
-  const t = new Date(quan).getTime();
-  if(isNaN(t)) return S.racions || {};
-  let r = null;
-  for(const e of h){
-    if(new Date(e.quan).getTime() <= t) r = e.racions;
-    else break;                      // l'històric va en ordre cronològic
-  }
-  return r || {};                    // abans del primer canvi: les de base
+  return vigentEn(S.racionsHist, quan, S.racions, "racions");
+}
+
+/* El mateix per als àpats petits. Sense això, canviar avui la recepta del
+   batut canviava la valoració d'un esmorzar de fa mesos: apatsFixos(quan)
+   rebia el moment però no el feia servir. */
+function apuntarApatsFixos(){
+  S.apatsFixosHist = S.apatsFixosHist || [];
+  S.apatsFixosHist.push({quan:new Date().toISOString(),
+                         qui: quiSoc() || "aquest aparell",
+                         apatsFixos: JSON.parse(JSON.stringify(S.apatsFixos||{}))});
+  retallarHist(S.apatsFixosHist);
+}
+function apatsFixosVigents(quan){
+  return vigentEn(S.apatsFixosHist, quan, S.apatsFixos, "apatsFixos");
 }
 
 /* El moment amb què s'ha de valorar un dia. L'inici d'avui és el que
@@ -1264,9 +1309,11 @@ const APATS_FIXOS_BASE = {
   berenar: {n:"Berenar", ajuda:"Peça de fruita, i boletes, entrepà o fruits secs",
             min:{fruita:90}, cal:{}, alguna:{boleta:90, greix:30, pa:50}},
 };
+/* Sense argument, els d'ara (és el que necessita la Guia per editar-los).
+   Amb un moment, els que regien llavors. */
 function apatsFixos(quan){
   const r = JSON.parse(JSON.stringify(APATS_FIXOS_BASE));
-  for(const [apat, c] of Object.entries(S.apatsFixos||{})){
+  for(const [apat, c] of Object.entries(apatsFixosVigents(quan))){
     if(!r[apat]) continue;
     for(const camp of ["min","cal","alguna"])
       if(c[camp]) r[apat][camp] = Object.assign({}, r[apat][camp], c[camp]);
@@ -1628,6 +1675,7 @@ if (typeof module !== "undefined") module.exports = {
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
   desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,
   RACIONS_BASE, apuntarRacions, racionsVigents, momentDe, MOMENT_ARA,
+  apuntarApatsFixos, apatsFixosVigents, retallarHist, MAX_HIST,
   fotografiarDia, teFotografia, apatDelDiaViu, recalcularPlat,
   previsioActualitzacio, aplicarActualitzacio, arrodonirQty,
   checkItems, equivalents, opcionsGrup, comptaRacions, apatsFets,

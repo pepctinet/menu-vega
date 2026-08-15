@@ -105,15 +105,32 @@ function nutriSum(items){
   t.desconeguts = desconeguts;
   return t;
 }
-function targetActual(){ return Object.assign({}, DEF_TARGET, S.target||{}); }
+/* Sense argument, els objectius d'ara. Amb un moment, els que regien
+   llavors: un dia validat s'ha de poder tornar a llegir amb els objectius
+   que tenia quan es va validar, no amb els d'avui. Mateix mecanisme que
+   les racions i els àpats fixos. */
+function targetActual(quan){
+  return Object.assign({}, DEF_TARGET, vigentEn(S.targetHist, quan, S.target, "target") || {});
+}
+function apuntarTarget(){
+  S.targetHist = S.targetHist || [];
+  S.targetHist.push({quan:new Date().toISOString(),
+                     qui: (typeof quiSoc==="function" ? quiSoc() : null) || "aquest aparell",
+                     target: JSON.parse(JSON.stringify(S.target||null))});
+  retallarHist(S.targetHist);
+}
 
 /* Valoració numèrica completa d'un dia — només amb sessió desbloquejada */
 function scoreDayFull(day){
+  const q = momentDe(day);
   const items = dayItems(day);
   const t = nutriSum(items);
   const s = structure(items);
-  const T = targetActual();
-  const fets = MEALS.filter(m=>day.meals[m.id]).length;
+  const T = targetActual(q);
+  /* apatsFets, no day.meals: un àpat que ella s'ha construït o que ha fet
+     fora també és un àpat fet. Comptant només els programats, el mateix
+     dia sortia com a "3 de 5" a l'informe i com a complet a la resta. */
+  const fets = apatsFets(day);
   const C = [];
   C.push({ok:fets===5, t:"5 àpats planificats", v:fets+"/5"});
   C.push({ok:Math.abs(t.kcal-T.kcal)<=T.kcal*KCAL_BAND,
@@ -131,28 +148,30 @@ function scoreDayFull(day){
           checks:C, t, s, fets, kcal:t.kcal, prot:t.p};
 }
 
-/* Valoració numèrica d'un àpat */
-function scoreMealFull(dishId, mealId){
+/* Valoració numèrica d'un àpat.
+   Els criteris surten de la Guia, no d'aquí: abans hi havia 20 g de
+   proteïna, 200 g de verdura i 55 g d'hidrats escrits a mà, que no es
+   movien encara que la nutricionista canviés una ració. Resultat: el
+   mateix plat podia ser correcte per a l'estructura i incorrecte per als
+   números. Ara les dues coses diuen el mateix perquè miren el mateix. */
+function scoreMealFull(dishId, mealId, quan){
   const d = dishById(dishId);
   if(!d) return null;
-  const t = nutriSum(d.i), s = structure(d.i);
+  return scoreItemsFull(d.i, mealId, quan);
+}
+function scoreItemsFull(items, mealId, quan){
+  const t = nutriSum(items), s = structure(items);
+  const r = checkItems(items, mealId, quan);
   const C = [];
-  if(mealId==="dinar"||mealId==="sopar"){
-    C.push({ok:t.p>=20, t:"Proteïna ≥ 20 g", v:Math.round(t.p)+" g"});
-    C.push({ok:s.g.verd>=200, t:"Verdura ≥ 200 g", v:Math.round(s.g.verd)+" g"});
-    C.push({ok:s.g.hc>=55, t:"Hidrats de carboni presents", v:Math.round(s.g.hc)+" g"});
-    C.push({ok:s.greixos.length>=2, t:"2 greixos saludables diferents", v:s.greixos.length});
-  } else {
-    const r = checkMeal(dishId, mealId);
-    r.falten.forEach(x=>C.push({ok:false, t:"Hi falta "+x, v:""}));
-    if(r.complet) C.push({ok:true, t:"Compleix l'estructura de la guia", v:""});
-    C.push({ok:true, t:"Energia de l'àpat", v:Math.round(t.kcal)+" kcal"});
-  }
+  if(r.complet) C.push({ok:true, t:"Compleix l'estructura de la guia", v:""});
+  else r.falten.forEach(x=>C.push({ok:false, t:"Hi falta "+x, v:""}));
+  C.push({ok:true, t:"Energia de l'àpat", v:Math.round(t.kcal)+" kcal"});
   const rell = C.filter(x=>x.t!=="Energia de l'àpat");
   const ok = rell.filter(x=>x.ok).length;
   return {lvl: ok===rell.length ? "v" : (ok>=rell.length-1 ? "g" : "r"), checks:C, t, s};
 }
 
 if (typeof module !== "undefined") module.exports = {
-  NUTRI, DEF_TARGET, KCAL_BAND, nutriSum, targetActual, scoreDayFull, scoreMealFull
+  NUTRI, DEF_TARGET, KCAL_BAND, nutriSum, targetActual, apuntarTarget,
+  scoreDayFull, scoreMealFull, scoreItemsFull
 };
