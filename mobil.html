@@ -320,7 +320,7 @@ function pintar(){
           <span class="hora">${m.h}</span>
           <span class="nomapat">${m.n}</span>
         </div>
-        <div class="plegat-cap" onclick="desplegar('${m.id}')">
+        <div class="plegat-cap" onclick="desplegar('${escJs(m.id)}')">
           <span class="nm ${a?"":"buit"}">${a ? esc(a.tipus==="fora" ? "Àpat fora de casa" : a.n) : "Sense triar"}</span>
           <span class="mini">${est?`<span class="pt ${est}"></span>`:""}
             ${teFoto?'<span class="pt" style="background:#c9c5b6"></span>':""}</span>
@@ -336,7 +336,7 @@ function pintar(){
         ${ara===m.id?'<span class="ara-tag">ara</span>':""}
         ${obertManual && ara!==m.id
           ? `<button style="margin-left:auto;color:var(--gris);font-size:13px"
-              onclick="plegar('${m.id}')">plegar ▴</button>` : ""}
+              onclick="plegar('${escJs(m.id)}')">plegar ▴</button>` : ""}
       </div>
       <div class="mb">`;
 
@@ -344,7 +344,7 @@ function pintar(){
       h += `<div class="plat buit">Sense triar</div>`;
     } else if(a.tipus==="fora"){
       h += `<div class="plat">Àpat fora de casa</div>
-        <span class="marca fora">${a.lloc||"Fora"}</span>
+        <span class="marca fora">${esc(a.lloc||"Fora")}</span>
         <div class="foratxt">${esc(a.n)}</div>`;
     } else {
       /* Una sola API per a tots cinc àpats. Abans els àpats petits es
@@ -369,19 +369,19 @@ function pintar(){
         const p = dishById(day.postres[m.id]);
         h += bloc
           ? (p ? `<div class="postr">Postres: <b>${esc(p.n)}</b></div>` : "")
-          : `<button class="postr canvi" onclick="obrirPostres('${m.id}')">
+          : `<button class="postr canvi" onclick="obrirPostres('${escJs(m.id)}')">
                Postres: <b>${p ? esc(p.n) : "triar-les"}</b> <span class="fl">▾</span></button>`;
       }
     }
 
     if(!bloc){
       h += `<div class="macc">
-        <button onclick="obrirCanvi('${m.id}')">${IC.canvi} ${a?"Canviar":"Triar"}</button>
-        <button onclick="obrirFora('${m.id}')">${IC.fora} Menjo fora</button>
-        <button onclick="ferFoto('${m.id}')">${IC.camera} ${teFoto?"Refer la foto":"Foto"}</button>
+        <button onclick="obrirCanvi('${escJs(m.id)}')">${IC.canvi} ${a?"Canviar":"Triar"}</button>
+        <button onclick="obrirFora('${escJs(m.id)}')">${IC.fora} Menjo fora</button>
+        <button onclick="ferFoto('${escJs(m.id)}')">${IC.camera} ${teFoto?"Refer la foto":"Foto"}</button>
       </div>`;
     } else {
-      h += `<div class="macc"><button onclick="ferFoto('${m.id}')">${IC.camera} ${teFoto?"Refer la foto":"Foto"}</button></div>`;
+      h += `<div class="macc"><button onclick="ferFoto('${escJs(m.id)}')">${IC.camera} ${teFoto?"Refer la foto":"Foto"}</button></div>`;
     }
     h += `<div id="foto-${m.id}"></div>`;
 
@@ -397,8 +397,8 @@ function pintar(){
       MEALS.map(m=>`<div class="meal"><div class="mh"><span class="hora">${m.h}</span>
         <span class="nomapat">${m.n}</span></div><div class="mb">
         <div class="plat buit">Sense triar</div>
-        <div class="macc"><button onclick="obrirCanvi('${m.id}')">${IC.canvi} Triar</button>
-        <button onclick="obrirFora('${m.id}')">${IC.fora} Menjo fora</button></div>
+        <div class="macc"><button onclick="obrirCanvi('${escJs(m.id)}')">${IC.canvi} Triar</button>
+        <button onclick="obrirFora('${escJs(m.id)}')">${IC.fora} Menjo fora</button></div>
         </div></div>`).join("")+`</main>`;
   }
 
@@ -408,7 +408,7 @@ function pintar(){
 
 function pintarHabits(day){
   return `<div class="habits">`+habits().map(x=>
-    `<button class="hb ${day.habits.includes(x.id)?"on":""}" onclick="ferHabit('${x.id}')">
+    `<button class="hb ${day.habits.includes(x.id)?"on":""}" onclick="ferHabit('${escJs(x.id)}')">
       ${day.habits.includes(x.id)?"✓ ":""}${esc(x.n)}</button>`).join("")+`</div>`;
 }
 function ferHabit(id){
@@ -425,7 +425,7 @@ function pintarSensacio(day, mealId){
   return `<div class="sens"><div class="t">Com t'has sentit? (pots deixar-ho en blanc)</div>
     <div class="sensbtns">`+SENSACIONS.map(x=>
       `<button class="sb ${s===x.id?"on":""}" style="${s===x.id?"border-color:"+x.color:""}"
-        onclick="marcarSensacio('${mealId}','${x.id}')" aria-label="${x.n}">
+        onclick="marcarSensacio('${escJs(mealId)}','${escJs(x.id)}')" aria-label="${x.n}">
         <span class="b" style="background:${x.color}"></span></button>`).join("")+
     `</div></div>`;
 }
@@ -509,7 +509,7 @@ function htmlPlats(q){
       Object.keys(d.i).some(k=>ing(k) && ing(k).n.toLowerCase().includes(q)));
   return `<input class="cerca" id="cercaPlat" placeholder="Cercar…" value="${esc(q)}">`+
     (list.length ? list.map(d=>
-      `<div class="opt ${actual===d.id?"sel":""}" onclick="triarPlat('${d.id}')">
+      `<div class="opt ${actual===d.id?"sel":""}" onclick="triarPlat('${escJs(d.id)}')">
         <div class="t">${esc(d.n)}</div>
         <div class="s">${esc(ingList(d.i))}</div></div>`
     ).join("") : `<div class="buit">Cap plat amb aquest nom.<br>Prova de muntar-lo tu.</div>`);
@@ -569,12 +569,12 @@ function htmlConstructor(){
       for(const t of triats){
         h += `<div class="tria"><span class="nm">${esc(ing(t.k).n)}</span>
           <span class="qq">${esc(qtyTxt(t.k, cons[t.k]))}</span>
-          <button onclick="treureCons('${t.k}')" style="color:var(--gris);font-size:19px;padding:0 4px">×</button></div>`;
+          <button onclick="treureCons('${escJs(t.k)}')" style="color:var(--gris);font-size:19px;padding:0 4px">×</button></div>`;
       }
     } else {
       h += `<div class="tria buida"><span class="nm">encara no n'has triat cap</span></div>`;
     }
-    h += `<button class="afegir" onclick="obrirTriaGrup('${g}')">+ afegir ${def.n.toLowerCase()}</button></div>`;
+    h += `<button class="afegir" onclick="obrirTriaGrup('${escJs(g)}')">+ afegir ${def.n.toLowerCase()}</button></div>`;
   }
 
   const f = checkItems(cons, mealId);
@@ -597,7 +597,7 @@ function obrirTriaGrup(grup){
   cont.dataset.tornar = "1";
   cont.innerHTML = `<button class="btn g" style="margin-bottom:12px" onclick="modeCanvi('grups')">‹ Tornar</button>
     <div style="font-size:12.5px;color:var(--gris);margin-bottom:10px">${esc(R.ajuda||"")}</div>`+
-    ops.map(o=>`<div class="opt" onclick="afegirCons('${o.k}',${o.grams})">
+    ops.map(o=>`<div class="opt" onclick="afegirCons('${escJs(o.k)}',${o.grams})">
       <div class="optrow"><div>
         <div class="t">${esc(o.n)}</div>
         ${o.nota?`<div class="s">${esc(o.nota)}</div>`:""}
@@ -655,7 +655,7 @@ function obrirPostres(mealId){
       La indicació és anar alternant el iogurt i la fruita entre el dinar i el sopar.
       ${pAltre ? `Al ${esc(altre)} hi tens <b>${esc(pAltre.n)}</b>.` : ""}</div>`,
     POSTRES.map(p=>`<div class="opt ${actual===p.id?"sel":""}"
-        onclick="triarPostres('${p.id}')">
+        onclick="triarPostres('${escJs(p.id)}')">
         <div class="optrow"><div><div class="t">${esc(p.n)}</div></div>
         <div class="q">${esc(ingList(p.i))}</div></div></div>`).join("")+
     (actual?`<button class="btn g" style="margin-top:9px" onclick="treurePostres()">
@@ -686,7 +686,7 @@ function obrirFora(mealId){
     <div style="font-size:12.5px;color:var(--gris);margin:6px 0 10px">
       Apunta el que hagis menjat, com et vagi bé. No cal detallar quantitats.</div>`,
     `<div class="plantilles">`+PLANTILLES.map(p=>
-      `<button class="pl" onclick="posarLloc('${esc(p)}')">${esc(p)}</button>`).join("")+`</div>
+      `<button class="pl" onclick="posarLloc('${escJs(p)}')">${esc(p)}</button>`).join("")+`</div>
      <input class="camp" id="foraLloc" placeholder="On? (opcional)" value="${esc(actual.lloc||"")}">
      <textarea class="camp" id="foraTxt" placeholder="Què has menjat?">${esc(actual.text||"")}</textarea>
      <button class="btn" onclick="desarFora()">Desar</button>
@@ -729,7 +729,7 @@ async function mostrarFotos(){
     if(!blob){ cont.innerHTML = `<div class="postr" style="margin-top:10px">Foto desada</div>`; continue; }
     const url = URL.createObjectURL(blob);
     cont.innerHTML = `<div class="foto"><img src="${url}" alt="">
-      <button class="x" onclick="treureFoto('${m.id}')">×</button></div>
+      <button class="x" onclick="treureFoto('${escJs(m.id)}')">×</button></div>
       ${pendent ? `<div class="postr" style="margin-top:6px">Encara no s'ha enviat · s'enviarà sola</div>` : ""}`;
   }
 }

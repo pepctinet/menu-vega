@@ -482,7 +482,7 @@ function viewSetmana(){
       const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
       const sup = supervisioDe(day, m.id);
       const sx = sup ? SUPERVISIO.find(x=>x.id===sup) : null;
-      html += `<div class="slot${val?" block":""}" ${val?"":`onclick="obrirTria('${ds}','${m.id}')"`}>
+      html += `<div class="slot${val?" block":""}" ${val?"":`onclick="obrirTria('${escJs(ds)}','${escJs(m.id)}')"`}>
         <div class="row" style="justify-content:space-between">
           <span class="row" style="gap:5px">
             ${sx?`<span class="sup ${sx.omplert}" title="${esc(sx.n)}"></span>`:""}
@@ -491,7 +491,7 @@ function viewSetmana(){
           <span class="row" style="gap:4px">
             ${sd?`<span class="quad" style="background:${sd.color}" title="S'hi ha sentit ${esc(sd.n.toLowerCase())}"></span>`:""}
             ${foto&&obert?`<button class="foto-marca" title="Veure la fotografia"
-               onclick="event.stopPropagation();veureFoto('${ds}','${m.id}')">◉</button>`:""}
+               onclick="event.stopPropagation();veureFoto('${escJs(ds)}','${escJs(m.id)}')">◉</button>`:""}
             ${a ? boleta(c ? c.complet : true, false) : ""}
           </span>
         </div>
@@ -505,7 +505,7 @@ function viewSetmana(){
       if(m.id==="dinar"||m.id==="sopar"){
         const p = dishById(day.postres[m.id]);
         html += `<div class="xs" style="margin:-3px 0 1px 8px;color:#9a978c;${val?"":"cursor:pointer"}"
-          ${val?"":`onclick="obrirPostres('${ds}','${m.id}')"`}>
+          ${val?"":`onclick="obrirPostres('${escJs(ds)}','${escJs(m.id)}')"`}>
           ↳ postres: <b style="color:var(--verd-fosc)">${p?esc(p.n):"triar"}</b></div>`;
       }
     }
@@ -519,10 +519,10 @@ function viewSetmana(){
         ${chk.complet?`<span class="eq">Equilibrat</span>`:""}</div>`;
     }
     html += `<div class="row no-print" style="gap:5px;margin-top:3px">
-        <button class="btn ghost sm" style="flex:1" onclick="obrirDia('${ds}')">Detall</button>
+        <button class="btn ghost sm" style="flex:1" onclick="obrirDia('${escJs(ds)}')">Detall</button>
         ${obert ? (val
-          ? `<button class="btn ghost sm" onclick="desvalidar('${ds}')" title="Reobrir el dia">↺</button>`
-          : (teMenu?`<button class="btn sm" onclick="validar('${ds}')" title="Tancar el dia i desar-lo al registre">Validar</button>`:"")
+          ? `<button class="btn ghost sm" onclick="desvalidar('${escJs(ds)}')" title="Reobrir el dia">↺</button>`
+          : (teMenu?`<button class="btn sm" onclick="validar('${escJs(ds)}')" title="Tancar el dia i desar-lo al registre">Validar</button>`:"")
         ) : ""}
       </div></div></div>`;
   }
@@ -604,7 +604,7 @@ function pintarTria(){
   $("#llista").innerHTML = `<div class="dishlist">`+(list.length?list.map(d=>{
     const c  = checkMeal(d.id, triaCtx.mealId);
     const ms = obert ? scoreMealFull(d.id, triaCtx.mealId) : null;
-    return `<div class="dish ${cur===d.id?"sel":""}" onclick="triar('${d.id}')">
+    return `<div class="dish ${cur===d.id?"sel":""}" onclick="triar('${escJs(d.id)}')">
       ${boleta(c.complet, false, "margin-top:6px")}
       <div class="info">
         <div class="t">${esc(d.n)} ${d.src?`<span class="tag">${esc(d.src)}</span>`:""}</div>
@@ -612,7 +612,7 @@ function pintarTria(){
         ${obert?`<div class="mac">${Math.round(ms.t.kcal)} kcal · ${Math.round(ms.t.p)} g P · ${Math.round(ms.t.c)} g HC · ${Math.round(ms.t.f)} g G</div>`
                :(c.complet?`<div class="mac">Equilibrat</div>`:"")}
       </div>
-      <button class="btn ghost sm" onclick="event.stopPropagation();closeModal();cfgFrom('${d.id}')">editar</button>
+      <button class="btn ghost sm" onclick="event.stopPropagation();closeModal();cfgFrom('${escJs(d.id)}')">editar</button>
     </div>`;}).join("") : `<div class="muted pad">Cap plat amb aquest nom.</div>`)+`</div>`;
 }
 function triar(id){
@@ -660,7 +660,7 @@ function suggerirCadena(ds, mealId, sug){
         Vols que ho canviï? Si dius que no, no es tocarà res.</div>
       <div class="avis">${linies}</div>
       <div class="row" style="gap:8px;margin-top:12px">
-        <button class="btn" onclick="aplicarCadena('${ds}','${mealId}')">Sí, canvia-ho</button>
+        <button class="btn" onclick="aplicarCadena('${escJs(ds)}','${escJs(mealId)}')">Sí, canvia-ho</button>
         <button class="btn ghost" onclick="closeModal()">No, deixa-ho com està</button>
       </div>
     </div>`, true);
@@ -692,7 +692,7 @@ function avisAutomatics(){
         <span class="small muted">ara hi ha ${esc(nomPlat(dayData(a.ds).meals[a.mealId]))}
           · abans ${esc(nomPlat(a.abans))} · ${esc(a.motiu)}</span>
         <button class="btn ghost sm no-print" style="margin-left:auto"
-          onclick="desferCanviAuto('${a.ds}','${a.mealId}')">Desfer</button></div>`;
+          onclick="desferCanviAuto('${escJs(a.ds)}','${escJs(a.mealId)}')">Desfer</button></div>`;
     }
     h += `<div class="row no-print" style="margin-top:8px;gap:8px">
       <button class="btn ghost sm" onclick="desferTotsAuto()">Desfer-ho tot</button>
@@ -730,11 +730,11 @@ function obrirPostres(ds, meal){
     <button class="close" onclick="closeModal()">×</button></div>
     <div class="mbody"><div class="dishlist">`+
     POSTRES.map(p=>`<div class="dish ${cur===p.id?"sel":""}"
-      onclick="triarPostres('${ds}','${meal}','${p.id}')">
+      onclick="triarPostres('${escJs(ds)}','${escJs(meal)}','${p.id}')">
       <div class="info"><div class="t">${esc(p.n)}</div>
       <div class="ing">${esc(ingList(p.i))}</div></div></div>`).join("")+
     `</div><button class="btn ghost sm" style="margin-top:10px"
-      onclick="triarPostres('${ds}','${meal}','')">Sense postres</button></div>`);
+      onclick="triarPostres('${escJs(ds)}','${escJs(meal)}','')">Sense postres</button></div>`);
 }
 function triarPostres(ds, meal, id){
   const d = dayData(ds);
@@ -786,7 +786,7 @@ function obrirDia(ds){
 
   h += `<div class="sec-title"><h2 style="font-size:15px">Indicacions d'hàbits</h2></div><div class="inds">`+
     habits().map(x=>`<button class="ind ${day.habits.includes(x.id)?"on":""}"
-      onclick="toggleHabit('${ds}','${x.id}')">${day.habits.includes(x.id)?"✓":"○"} ${esc(x.n)}</button>`)
+      onclick="toggleHabit('${escJs(ds)}','${escJs(x.id)}')">${day.habits.includes(x.id)?"✓":"○"} ${esc(x.n)}</button>`)
     .join("")+`</div>`;
 
   if(obert){
@@ -796,10 +796,10 @@ function obrirDia(ds){
       <div class="galeria" id="galDia"></div>`;
     h += `<div class="row" style="margin-top:16px;border-top:1px solid var(--linia);padding-top:14px">`;
     if(esValidat(day))
-      h += `<button class="btn ghost" onclick="desvalidar('${ds}');closeModal()">Reobrir el dia</button>
+      h += `<button class="btn ghost" onclick="desvalidar('${escJs(ds)}');closeModal()">Reobrir el dia</button>
             <span class="small muted">El dia està tancat: no es pot editar des del mòbil.</span>`;
     else
-      h += `<button class="btn" onclick="validar('${ds}');closeModal()">Validar i tancar el dia</button>
+      h += `<button class="btn" onclick="validar('${escJs(ds)}');closeModal()">Validar i tancar el dia</button>
             <span class="small muted">Queda desat al registre per a la nutricionista.</span>`;
     h += `</div>`;
   }
@@ -965,8 +965,8 @@ function viewConfigurador(){
       ${g.ajuda?`<div class="xs muted" style="margin:-4px 0 7px">${esc(g.ajuda)}</div>`:""}
       <div class="chips">`+
       list.map(([k,v])=>`<button class="chip ${cfg.i[k]!==undefined?"on":""}"
-        onclick="cfgToggle('${k}')">${esc(v.n)}${S.customIng[k]?" ·":""}</button>`).join("")+
-      `<button class="chip nou" onclick="nouAliment('${g.k}')">+ afegir aliment</button>`+
+        onclick="cfgToggle('${escJs(k)}')">${esc(v.n)}${S.customIng[k]?" ·":""}</button>`).join("")+
+      `<button class="chip nou" onclick="nouAliment('${escJs(g.k)}')">+ afegir aliment</button>`+
       `</div></div>`;
   }
   h += `</div><div class="card pad">
@@ -977,9 +977,9 @@ function viewConfigurador(){
       return `<div class="qrow"><span class="nm">${esc(x.n)}
         ${x.nota?`<span class="xs muted">(${esc(x.nota)})</span>`:""}
         <div class="xs muted">${esc(qtyTxt(k,g))}</div></span>
-        <input type="number" min="0" step="5" value="${g}" onchange="cfgQty('${k}',this.value)">
+        <input type="number" min="0" step="5" value="${g}" onchange="cfgQty('${escJs(k)}',this.value)">
         <span class="un">${x.ml?"ml":"g"}</span>
-        <button class="close" style="font-size:16px" onclick="cfgToggle('${k}')">×</button></div>`;
+        <button class="close" style="font-size:16px" onclick="cfgToggle('${escJs(k)}')">×</button></div>`;
     }).join("") : `<div class="muted small" style="padding:10px 0">Encara no hi ha cap ingredient.</div>`;
 
   if(obert){
@@ -1030,7 +1030,7 @@ function viewConfigurador(){
       <div class="xs muted" style="margin-bottom:6px">Es podrà triar en aquests àpats:</div>
       <div class="chips" style="margin-bottom:12px">`+
       MEALS.map(m=>`<button class="chip ${cfg.m.includes(m.id)?"on":""}"
-        onclick="cfgMeal('${m.id}')">${m.n}</button>`).join("")+`</div>
+        onclick="cfgMeal('${escJs(m.id)}')">${m.n}</button>`).join("")+`</div>
       <div class="row">
         <button class="btn" onclick="cfgSave()">${cfg.editant?"Desar els canvis":"Desar el plat"}</button>
         <button class="btn ghost" onclick="cfgFrom(null)">Començar de nou</button>
@@ -1047,13 +1047,13 @@ function viewConfigurador(){
       <div class="card pad"><div class="dishlist" style="max-height:none">`+
       S.custom.map(d=>{
         const cc = checkMeal(d.id, d.m[0]);
-        return `<div class="dish" onclick="cfgFrom('${d.id}')">
+        return `<div class="dish" onclick="cfgFrom('${escJs(d.id)}')">
         ${cc.complet?`<span class="dot v" style="margin-top:6px"></span>`
                     :`<span class="dot" style="margin-top:6px;background:#e0ddd2"></span>`}
         <div class="info"><div class="t">${esc(d.n)}</div>
         <div class="ing">${esc(ingList(d.i))}</div>
         <div class="mac">${d.m.map(x=>(MEALS.find(y=>y.id===x)||{n:x}).n).join(", ")}</div></div>
-        <button class="btn danger sm" onclick="event.stopPropagation();retirarPlat('${d.id}')">desactivar</button>
+        <button class="btn danger sm" onclick="event.stopPropagation();retirarPlat('${escJs(d.id)}')">desactivar</button>
         </div>`;}).join("")+`</div></div>`;
   }
 
@@ -1064,8 +1064,8 @@ function viewConfigurador(){
         <div class="xs muted">${esc((CATS.find(c=>c.k===v.cat)||{t:v.cat}).t)} · ${esc(v.shop||"")}
         ${obert&&v.nutri?` · ${v.nutri.kcal} kcal/100 ${v.ml?"ml":"g"}`:""}</div></td>
         <td style="width:150px" class="qty">ref. ${qtyTxt(k, qtyRef(k))}</td>
-        <td style="width:90px"><button class="btn ghost sm" onclick="nouAliment('${v.cat}','${k}')">editar</button></td>
-        <td style="width:90px"><button class="btn danger sm" onclick="esborrarAliment('${k}')">esborrar</button></td></tr>`).join("")+
+        <td style="width:90px"><button class="btn ghost sm" onclick="nouAliment('${escJs(v.cat)}','${escJs(k)}')">editar</button></td>
+        <td style="width:90px"><button class="btn danger sm" onclick="esborrarAliment('${escJs(k)}')">esborrar</button></td></tr>`).join("")+
       `</table></div>`;
   }
 
@@ -1312,14 +1312,14 @@ function viewPlats(){
           ${obert?`<div class="mac">${Math.round(ms.t.kcal)} kcal · ${Math.round(ms.t.p)} g P · ${Math.round(ms.t.c)} g HC · ${Math.round(ms.t.f)} g G</div>`:""}
         </div>
         <div style="display:flex;flex-direction:column;gap:5px">
-          <button class="btn ghost sm" onclick="cfgFrom('${d.id}')">editar</button>
-          <button class="btn ghost sm" onclick="cfgFrom('${d.id}','duplicar')">duplicar</button>
-          ${d.editat?`<button class="btn ghost sm" onclick="restaurarPlat('${d.id}')">original</button>`:""}
+          <button class="btn ghost sm" onclick="cfgFrom('${escJs(d.id)}')">editar</button>
+          <button class="btn ghost sm" onclick="cfgFrom('${escJs(d.id)}','duplicar')">duplicar</button>
+          ${d.editat?`<button class="btn ghost sm" onclick="restaurarPlat('${escJs(d.id)}')">original</button>`:""}
           ${d.amagat
-            ? `<button class="btn sm" onclick="tornarPlat('${d.id}')">activar</button>`
-            : `<button class="btn ghost sm" onclick="retirarPlat('${d.id}')">desactivar</button>`}
+            ? `<button class="btn sm" onclick="tornarPlat('${escJs(d.id)}')">activar</button>`
+            : `<button class="btn ghost sm" onclick="retirarPlat('${escJs(d.id)}')">desactivar</button>`}
           ${d.amagat && !d.base
-            ? `<button class="btn danger sm" onclick="esborrarPlatDelTot('${d.id}')">esborrar</button>`:""}
+            ? `<button class="btn danger sm" onclick="esborrarPlatDelTot('${escJs(d.id)}')">esborrar</button>`:""}
         </div></div>`;
     }).join("") : `<div class="muted pad">Cap plat amb aquest filtre.</div>`;
   h += `</div></div>`;
@@ -1355,11 +1355,11 @@ function seccioReceptes(){
           <span class="xs muted">g</span></span>`).join("")+
       `</div>
       <div class="row" style="margin-top:11px">
-        <button class="btn sm" onclick="desarRecepta('${k}')">Desar</button>
-        ${v.editat?`<button class="btn ghost sm" onclick="restaurarRecepta('${k}')">Tornar a l'original</button>`:""}
-        ${v.meu?`<button class="btn danger sm" onclick="esborrarRecepta('${k}')">Esborrar</button>`:""}
+        <button class="btn sm" onclick="desarRecepta('${escJs(k)}')">Desar</button>
+        ${v.editat?`<button class="btn ghost sm" onclick="restaurarRecepta('${escJs(k)}')">Tornar a l'original</button>`:""}
+        ${v.meu?`<button class="btn danger sm" onclick="esborrarRecepta('${escJs(k)}')">Esborrar</button>`:""}
         ${v.prep&&Object.keys(v.prep).length<12
-          ? `<button class="btn ghost sm" onclick="afegirIngRecepta('${k}')">+ ingredient</button>`:""}
+          ? `<button class="btn ghost sm" onclick="afegirIngRecepta('${escJs(k)}')">+ ingredient</button>`:""}
       </div></div>`;
   }
   if(!preps.length) h += `<div class="muted">Encara no hi ha cap recepta.</div>`;
@@ -1458,7 +1458,7 @@ function afegirIngRecepta(k){
     <select class="search" id="ai_k">${opcions}</select>
     <div class="qrow"><span class="nm">Grams per cada 100 g de producte</span>
       <input type="number" step="0.1" id="ai_g" value="10"></div>
-    <button class="btn" style="margin-top:12px" onclick="ferAfegirIngRecepta('${k}')">Afegir</button>
+    <button class="btn" style="margin-top:12px" onclick="ferAfegirIngRecepta('${escJs(k)}')">Afegir</button>
     </div>`, true);
 }
 function ferAfegirIngRecepta(k){
@@ -1530,8 +1530,8 @@ function seccioRacions(){
           <span class="xs muted">${ing(k)&&ing(k).ml?"ml":"g"}</span></td></tr>`;
     }
     h += `</table><div class="row" style="margin-top:11px">
-      <button class="btn sm" onclick="desarRacions('${grup}')">Desar ${esc(d.n.toLowerCase())}</button>
-      ${S.racions[grup]?`<button class="btn ghost sm" onclick="restaurarRacions('${grup}')">Tornar a l'original</button>`:""}
+      <button class="btn sm" onclick="desarRacions('${escJs(grup)}')">Desar ${esc(d.n.toLowerCase())}</button>
+      ${S.racions[grup]?`<button class="btn ghost sm" onclick="restaurarRacions('${escJs(grup)}')">Tornar a l'original</button>`:""}
       </div></div>`;
   }
   return h+`</div>`;
@@ -1684,7 +1684,7 @@ function viewCompra(){
     for(const [ik,g] of sec[k]){
       const tinc = !!S.pantry[ik];
       h += `<tr style="${tinc?"opacity:.4;text-decoration:line-through":""}">
-        <td style="width:26px"><input type="checkbox" ${tinc?"checked":""} onchange="togglePantry('${ik}')"></td>
+        <td style="width:26px"><input type="checkbox" ${tinc?"checked":""} onchange="togglePantry('${escJs(ik)}')"></td>
         <td>${esc(ing(ik).n)}</td>
         <td class="qty" style="text-align:right;width:170px">${esc(qtyTxt(ik, shopRound(g)))}</td></tr>`;
     }
@@ -1832,7 +1832,7 @@ function viewRegistre(){
       }).join("")+`</td>
       <td class="xs muted">${day.habits.length}/${habits().length}</td>
       ${obert?`<td class="qty">${Math.round(sc.kcal)}</td><td class="qty">${Math.round(sc.prot)}</td>`:""}
-      <td>${nf?`<button class="btn ghost sm" onclick="obrirDia('${ds}')">${nf} ◉</button>`:'<span class="muted xs">—</span>'}</td>
+      <td>${nf?`<button class="btn ghost sm" onclick="obrirDia('${escJs(ds)}')">${nf} ◉</button>`:'<span class="muted xs">—</span>'}</td>
       </tr>`;
   }
   h += `</table></div>`;
@@ -2172,13 +2172,13 @@ function viewMissatges(){
           <span style="font-size:17px">📄</span>
           <span style="flex:1"><b class="small">${esc(m.doc.nom)}</b>
             <div class="xs muted">${(m.doc.mida/1024).toFixed(0)} kB</div></span>
-          <button class="btn ghost sm" onclick='obrirAdjunt(${JSON.stringify(m.doc)})'>obrir</button>
+          <button class="btn ghost sm" onclick="obrirAdjunt('${escJs(m.id)}')">obrir</button>
         </div>` : ""}
       <div class="peu">
         <span>${lectors.length
           ? "Llegit per "+lectors.map(esc).join(", ")
           : '<span style="color:var(--gris)">Encara no l\'ha llegit ningú</span>'}</span>
-        ${meu?`<button class="btn danger sm" onclick="treureMissatge('${m.id}')">esborrar</button>`:""}
+        ${meu?`<button class="btn danger sm" onclick="treureMissatge('${escJs(m.id)}')">esborrar</button>`:""}
       </div></div>`;
   }
   return h;
@@ -2213,7 +2213,15 @@ async function enviarMissatge(){
   adjuntPendent = null;
   tocarConfig(); render();
 }
-async function obrirAdjunt(doc){
+/* Es passa l'identificador del missatge, no la fitxa del document.
+   Abans el botó es construïa amb onclick='obrirAdjunt({...})' i tota la
+   fitxa hi anava a dins com a text: un nom de fitxer amb un apòstrof
+   trencava l'atribut, i amb la resta hi podia entrar codi. La fitxa no ha
+   de sortir mai del programa: es busca aquí. */
+async function obrirAdjunt(missatgeId){
+  const m = (S.missatges||[]).find(x=>x.id===missatgeId);
+  const doc = m && m.doc;
+  if(!doc) return alert("Aquest missatge ja no porta cap fitxer.");
   const blob = await Sync.baixarDocument(doc);
   if(!blob) return alert("No s'ha pogut obtenir el fitxer. Comprova la connexió.");
   const url = URL.createObjectURL(blob);
@@ -2278,9 +2286,9 @@ function viewPes(){
       <td class="xs muted">${esc(p.hora||"")}</td>
       <td class="small">${esc(obs)}</td>
       <td style="width:190px;white-space:nowrap">
-        <button class="btn ghost sm" onclick="editarPes('${p.ds}')">pes</button>
-        <button class="btn ghost sm" onclick="editarNota('${p.ds}')">nota</button>
-        ${p.pes!=null?`<button class="btn danger sm" onclick="esborrarPes('${p.ds}')">×</button>`:""}
+        <button class="btn ghost sm" onclick="editarPes('${escJs(p.ds)}')">pes</button>
+        <button class="btn ghost sm" onclick="editarNota('${escJs(p.ds)}')">nota</button>
+        ${p.pes!=null?`<button class="btn danger sm" onclick="esborrarPes('${escJs(p.ds)}')">×</button>`:""}
       </td></tr>`;
   }
   return h+`</table></div>`;
@@ -2492,20 +2500,20 @@ function blocRacions(){
           <div class="xs muted" style="margin-top:2px">
             ${eq ? "que són "+esc(eq) : "sense unitat equivalent"}
             <button class="btn ghost sm no-print" style="margin-left:6px;padding:0 7px"
-              onclick="editarUnitat('${esc(ak)}')"
+              onclick="editarUnitat('${escJs(ak)}')"
               title="Definir com se'n diu una unitat">unitat</button></div></td>
         <td style="width:150px;text-align:right">
           <input type="number" step="5" min="1" id="rac_${k}_${ak}" value="${a.g}"
             style="width:78px;padding:4px 6px;border:1px solid var(--linia);border-radius:7px;text-align:right">
           <span class="xs muted">${ing(ak)&&ing(ak).ml?"ml":"g"}</span>
           <button class="btn ghost sm no-print" style="margin-left:6px"
-            onclick="retirarDelGrup('${k}','${ak}')" title="Treure'l d'aquest grup">×</button></td></tr>`;
+            onclick="retirarDelGrup('${escJs(k)}','${escJs(ak)}')" title="Treure'l d'aquest grup">×</button></td></tr>`;
     }
     h += `</table>
       <div class="row" style="margin-top:11px;gap:8px">
-        <button class="btn sm" onclick="desarRacions('${k}')">Desar ${esc(titol.toLowerCase())}</button>
-        <button class="btn ghost sm" onclick="afegirAlGrup('${k}')">+ Afegir un aliment</button>
-        ${S.racions[k]?`<button class="btn ghost sm" onclick="restaurarRacions('${k}')">Tornar a l'original</button>`:""}
+        <button class="btn sm" onclick="desarRacions('${escJs(k)}')">Desar ${esc(titol.toLowerCase())}</button>
+        <button class="btn ghost sm" onclick="afegirAlGrup('${escJs(k)}')">+ Afegir un aliment</button>
+        ${S.racions[k]?`<button class="btn ghost sm" onclick="restaurarRacions('${escJs(k)}')">Tornar a l'original</button>`:""}
       </div></div>`;
   }
   return h;
@@ -2534,7 +2542,7 @@ function afegirAlGrup(grup){
         <b>Plats → Configurador</b> i torna aquí.</div>`}
       ${lliures.length?`<div class="xs muted" style="margin-bottom:4px">Quantitat d'una ració</div>
       <input class="search" type="number" id="ag_g" value="100" min="1" step="5">
-      <button class="btn" style="margin-top:12px" onclick="desarAfegitAlGrup('${grup}')">Afegir-lo</button>`:""}
+      <button class="btn" style="margin-top:12px" onclick="desarAfegitAlGrup('${escJs(grup)}')">Afegir-lo</button>`:""}
       <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button>
     </div>`, true);
 }
@@ -2604,9 +2612,9 @@ function editarUnitat(k){
           <div class="xs muted">Marca-ho per a les peces que poden ser petites, mitjanes o
             grans: una patata, una poma, un tomàquet. No ho marquis per a mesures com una
             cullerada, un got o un grapat, que no tenen mida.</div></span></label>
-      <button class="btn" style="margin-top:14px" onclick="desarUnitat('${esc(k)}')">Desar</button>
+      <button class="btn" style="margin-top:14px" onclick="desarUnitat('${escJs(k)}')">Desar</button>
       ${x.uq?`<button class="btn ghost" style="margin-top:9px"
-        onclick="treureUnitat('${esc(k)}')">Treure la unitat</button>`:""}
+        onclick="treureUnitat('${escJs(k)}')">Treure la unitat</button>`:""}
       <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button>
     </div>`, true);
 }
@@ -2659,7 +2667,7 @@ function editarApatFix(mealId){
       si l'àpat està complet</div></div>
     <button class="close" onclick="closeModal()">×</button></div>
     <div class="mbody">${cos}
-      <button class="btn" style="margin-top:12px" onclick="desarApatFix('${mealId}')">Desar</button>
+      <button class="btn" style="margin-top:12px" onclick="desarApatFix('${escJs(mealId)}')">Desar</button>
       <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button></div>`);
 }
 function desarApatFix(mealId){
@@ -2687,8 +2695,8 @@ function blocIndicacions(){
     (l.length ? l.map(x=>`<div class="spread" style="padding:6px 0;gap:10px">
         <span>· ${esc(x.t)}</span>
         <span class="row no-print" style="gap:5px;flex:none">
-          <button class="btn ghost sm" onclick="editarIndicacio('${esc(x.id)}')">editar</button>
-          <button class="btn ghost sm" onclick="retirarIndicacio('${esc(x.id)}')">×</button></span>
+          <button class="btn ghost sm" onclick="editarIndicacio('${escJs(x.id)}')">editar</button>
+          <button class="btn ghost sm" onclick="retirarIndicacio('${escJs(x.id)}')">×</button></span>
       </div>`).join("") : `<div class="muted">Cap indicació escrita.</div>`)+`</div>`;
 }
 function editarIndicacio(id){
@@ -2737,8 +2745,8 @@ function blocHabits(){
     (l.length ? l.map(x=>`<div class="spread" style="padding:6px 0;gap:10px">
         <span>· ${esc(x.n)}</span>
         <span class="row no-print" style="gap:5px;flex:none">
-          <button class="btn ghost sm" onclick="editarHabit('${esc(x.id)}')">editar</button>
-          <button class="btn ghost sm" onclick="retirarHabit('${esc(x.id)}')">×</button></span>
+          <button class="btn ghost sm" onclick="editarHabit('${escJs(x.id)}')">editar</button>
+          <button class="btn ghost sm" onclick="retirarHabit('${escJs(x.id)}')">×</button></span>
       </div>`).join("") : `<div class="muted">Cap hàbit.</div>`)+`</div>`;
 }
 function editarHabit(id){
@@ -2797,7 +2805,7 @@ function viewGuia(){
           ${Object.keys(F.cal||{}).length?`<div class="xs">Sempre: ${
             Object.entries(F.cal).map(([k,q])=>esc((ing(k)?ing(k).n:k)+" "+qtyTxt(k,q))).join(" · ")}</div>`:""}
           <button class="btn ghost sm no-print" style="margin-top:5px"
-            onclick="editarApatFix('${m.id}')">Canviar les quantitats</button>`
+            onclick="editarApatFix('${escJs(m.id)}')">Canviar les quantitats</button>`
         :`<div class="xs muted">Es mesura per racions (a sota)</div>`}</td></tr>`;
     }).join("") + `
     </table>

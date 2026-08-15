@@ -1657,8 +1657,28 @@ function tendenciaPes(serie, finestra){
 /* ---------------------------------------------------------------------
    14. UTILITATS COMUNES
    --------------------------------------------------------------------- */
-const esc = s => String(s==null?"":s).replace(/[&<>"]/g,
-  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+/* Escapar per posar text dins d'HTML.
+   Hi ha d'entrar l'apòstrof i l'accent obert, encara que semblin
+   innocents: mig aplicatiu construeix botons com onclick="f('${esc(x)}')",
+   i allà dins un apòstrof no és un caràcter qualsevol, és el final de la
+   cadena. Sense això, el botó fix "Casa d'algú" ja no funcionava, i un
+   nom de fitxer amb apòstrof podia sortir de l'atribut i convertir-se en
+   codi. Aquí hi ha sessió iniciada i dades de salut: no és el lloc per
+   anar just. */
+const esc = s => String(s==null?"":s).replace(/[&<>"'`]/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;",
+       "'":"&#39;","`":"&#96;"}[c]));
+
+/* I aquest és per al text que va dins d'una crida dins d'un atribut:
+       onclick="posarLloc('${escJs(p)}')"
+   Amb esc() sol no n'hi ha prou. El navegador primer descodifica
+   l'atribut i després passa el que queda al JavaScript: un &#39; li
+   arriba convertit en apòstrof i li tanca la cadena igualment. O sigui
+   que primer s'escapa per al JavaScript (barra i cometa) i després per a
+   l'HTML. Els salts de línia també hi entren: dins d'una cadena de
+   JavaScript, un salt de línia de debò és un error de sintaxi. */
+const escJs = s => esc(String(s==null?"":s)
+  .replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/\r?\n/g,"\\n"));
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 
@@ -1669,7 +1689,7 @@ if (typeof module !== "undefined") module.exports = {
   loadState, saveState, allIng, ing, DISHES, dishById, iso, monday, addDays,
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,
-  unitatTxt, nomUnitat, MIDES, plural,
+  unitatTxt, nomUnitat, MIDES, plural, esc, escJs,
   qtyRef, fruitPieces, postresAlternades, esValidat, TODAY, fmtDay, fmtLong,
   parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
