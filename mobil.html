@@ -135,13 +135,22 @@ button.postr .fl{margin-left:auto;color:var(--gris);font-size:12px}
 .ov{position:fixed;inset:0;background:rgba(30,30,26,.42);z-index:40;display:none}
 .ov.on{display:block}
 .sheet{position:fixed;left:0;right:0;bottom:0;max-height:90vh;background:var(--paper);
- border-radius:20px 20px 0 0;z-index:41;transform:translateY(100%);
- transition:transform .24s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;
- padding-bottom:var(--safe-b)}
+ border-radius:20px 20px 0 0;z-index:41;overflow:hidden;transform:translateY(100%);
+ transition:transform .24s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column}
 .sheet.on{transform:translateY(0)}
 .sh{padding:13px 16px 0;flex:none}
 .grip{width:38px;height:4px;background:#dcd8cc;border-radius:99px;margin:0 auto 12px}
-.shtit{display:flex;justify-content:space-between;align-items:baseline}
+/* Tancar. Abans el full només es tancava tocant a fora i no ho deia
+   enlloc; al mòbil no hi ha tecla Escape, o sigui que calia un botó de
+   debò. La creu té 44px, que és la mida mínima perquè s'encerti amb el dit. */
+.shx{position:absolute;top:9px;right:9px;width:44px;height:44px;border-radius:99px;
+ display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1;
+ color:var(--gris);background:var(--suau);border:1px solid var(--linia);z-index:2}
+.shx:active{background:var(--verd-clar)}
+.shpeu{padding:10px 16px calc(14px + var(--safe-b));border-top:1px solid var(--linia);
+ background:var(--paper)}
+.shpeu .btn{width:100%}
+.shtit{display:flex;justify-content:space-between;align-items:baseline;padding-right:46px}
 .shtit h2{font-size:17px}
 .tabs{display:flex;gap:6px;margin:12px 0 0;border-bottom:1px solid var(--linia)}
 .tabs button{flex:1;padding:10px 6px;font-size:13.5px;font-weight:600;color:var(--gris);
@@ -215,8 +224,10 @@ textarea.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-
 
 <div class="ov" id="ov"></div>
 <div class="sheet" id="sheet">
+  <button class="shx" id="shx" onclick="tancarFull()" aria-label="Tancar">×</button>
   <div class="sh" id="shHead"></div>
   <div class="sb2" id="shBody"></div>
+  <div class="shpeu"><button class="btn g" onclick="tancarFull()">Tancar</button></div>
 </div>
 
 <input type="file" accept="image/*" capture="environment" id="camera" style="display:none">

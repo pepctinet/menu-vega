@@ -510,8 +510,24 @@ const Sync = (() => {
     return {n, bytes, limit:LIMIT, percentatge: bytes/LIMIT*100};
   }
 
+  /* Els documents adjunts pesen més que les fotos i fins ara no es
+     comptaven enlloc. Van al mateix 1 GB, o sigui que el que importa és
+     el total: un compte per separat enganyaria. */
+  function espaiDocs(){
+    let n = 0, bytes = 0;
+    for(const d of (S.documents||[])){ n++; bytes += d.mida || 0; }
+    const LIMIT = 1024*1024*1024;
+    return {n, bytes, limit:LIMIT, percentatge: bytes/LIMIT*100};
+  }
+  function espaiTotal(){
+    const f = espaiFotos(), d = espaiDocs();
+    const bytes = f.bytes + d.bytes, LIMIT = 1024*1024*1024;
+    return {fotos:f, docs:d, n:f.n+d.n, bytes, limit:LIMIT,
+            percentatge: bytes/LIMIT*100};
+  }
+
   return {est, init, login, logout, push, pushSetmana, pushConfig, marcar,
-          pujarFoto, baixarFoto, esborrarFoto, espaiFotos, configurat,
+          pujarFoto, baixarFoto, esborrarFoto, espaiFotos, espaiDocs, espaiTotal, configurat,
           pujarDocument, baixarDocument, esborrarDocument};
 })();
 

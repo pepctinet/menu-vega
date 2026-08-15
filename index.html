@@ -105,6 +105,8 @@ textarea.msgbox{width:100%;padding:12px 14px;border:1px solid var(--linia);borde
    entren a la tria. Han de distingir-se d'un cop d'ull. */
 .dish.retirat{background:#f2f0e8;opacity:.72}
 .dish.retirat .t{text-decoration:line-through;text-decoration-color:#b9b5a6}
+.tancapeu{border-top:1px solid var(--linia);margin-top:14px;padding:9px 0 2px;
+ font-size:11.5px;color:var(--gris);text-align:center}
 /* Avís dels canvis que la reprogramació en cadena ha fet sola */
 .avis{background:var(--groc-clar);border:1px solid #eddcae;border-radius:10px;
  padding:11px 13px;margin-bottom:12px}
@@ -552,11 +554,20 @@ function viewSetmana(){
    ===================================================================== */
 function openModal(html, narrow){
   $("#modal").className = "modal"+(narrow?" narrow":"");
-  $("#modal").innerHTML = html;
+  /* El peu s'afegeix sempre aquí, no a cada crida: així cap quadre no es
+     queda sense dir com es tanca. */
+  $("#modal").innerHTML = html +
+    `<div class="tancapeu no-print">Prem <b>Escape</b> o clica fora per tancar</div>`;
   $("#ov").classList.add("on");
 }
 function closeModal(){ $("#ov").classList.remove("on"); }
+const modalObert = () => $("#ov").classList.contains("on");
 $("#ov").addEventListener("click", e=>{ if(e.target.id==="ov") closeModal(); });
+/* Es tancaven clicant a fora i prou, sense dir-ho enlloc. Ara també amb
+   Escape, i cada quadre ho anuncia a sota. */
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape" && modalObert()) closeModal();
+});
 function obrirZoom(url){ $("#zoomImg").src = url; $("#zoom").classList.add("on"); }
 function tancarZoom(){ $("#zoom").classList.remove("on"); }
 $("#zoom").addEventListener("click", e=>{ if(e.target.id==="zoom") tancarZoom(); });
@@ -2134,6 +2145,9 @@ function viewMissatges(){
     <div class="xs muted" style="margin-top:7px">PDF, document o imatge, fins a 8 MB.
       Cal tenir la sessió iniciada.</div></div>`;
 
+  /* Els documents no tenien comptador i són el que més pesa. */
+  h += barraEspai();
+
   if(!msgs.length) return h+`<div class="card pad muted">Encara no hi ha cap missatge.</div>`;
 
   for(const m of msgs){
@@ -2351,6 +2365,36 @@ function esborrarPes(ds){
 /* =====================================================================
    FOTOGRAFIES  (només amb accés)
    ===================================================================== */
+/* Barra d'espai. Fotos i documents comparteixen el mateix gigabyte, o
+   sigui que el que mana és el total: comptar-los per separat faria
+   pensar que hi ha més marge del que hi ha. */
+function barraEspai(){
+  const t = Sync.espaiTotal();
+  if(!t.n) return "";
+  const mb = x => x/1024/1024 < 1 ? Math.round(x/1024)+" kB" : (x/1024/1024).toFixed(1)+" MB";
+  const alerta = t.percentatge >= 80, avis = t.percentatge >= 60;
+  const color = alerta ? "var(--vermell)" : avis ? "var(--groc)" : "var(--verd)";
+  return `<div class="card pad" style="margin-bottom:14px">
+    <div class="spread">
+      <div><b>${mb(t.bytes)}</b> de l'espai gratuït (1 GB)
+        <div class="xs muted">
+          ${t.fotos.n} fotografi${t.fotos.n===1?"a":"es"} · ${mb(t.fotos.bytes)}
+          &nbsp;·&nbsp;
+          ${t.docs.n} document${t.docs.n===1?"":"s"} · ${mb(t.docs.bytes)}</div></div>
+      <div class="small" style="${alerta||avis?`color:${color};font-weight:700`:"color:var(--gris)"}">
+        ${t.percentatge<0.1 ? "menys del 0,1" : t.percentatge.toFixed(1)} %</div>
+    </div>
+    <div class="kbar" style="margin-top:8px"><span style="width:${Math.max(0.6,Math.min(100,t.percentatge))}%;
+      background:${color}"></span></div>
+    ${alerta ? `<div class="small" style="color:var(--vermell);margin-top:8px">
+      L'espai gratuït s'està acabant. Els documents adjunts són el que més pesa:
+      val la pena esborrar els que ja no calguin.</div>`
+    : avis ? `<div class="small" style="color:#8a6410;margin-top:8px">
+      Ja s'ha fet servir més de la meitat de l'espai. Encara no és urgent, però
+      convé anar-hi mirant.</div>` : ""}
+  </div>`;
+}
+
 function viewFotos(){
   const e = Sync.espaiFotos();
   const mb = (e.bytes/1024/1024);
