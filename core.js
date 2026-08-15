@@ -23,75 +23,130 @@ const ING = {
  soja_tex:  {n:"Soja texturitzada",      cat:"prot", shop:"Sec", nota:"pes en sec"},
  seitan:    {n:"Seitan",                 cat:"prot", shop:"Refrigerats"},
  tempeh:    {n:"Tempeh",                 cat:"prot", shop:"Refrigerats"},
- cigrons:   {n:"Cigrons cuits",          cat:"prot", shop:"Conserves"},
- llenties:  {n:"Llenties cuites",        cat:"prot", shop:"Conserves"},
- mongetes:  {n:"Mongetes cuites",        cat:"prot", shop:"Conserves"},
+ cigrons:   {n:"Cigrons cuits",          cat:"prot", shop:"Conserves",
+             uq:160, ul:"got", ug:"m"},
+ llenties:  {n:"Llenties cuites",        cat:"prot", shop:"Conserves",
+             uq:160, ul:"got", ug:"m"},
+ mongetes:  {n:"Mongetes cuites",        cat:"prot", shop:"Conserves",
+             uq:160, ul:"got", ug:"m"},
  edamame:   {n:"Edamame",                cat:"prot", shop:"Congelats"},
- ou:        {n:"Ou",                     cat:"prot", shop:"Refrigerats", uq:55, ul:"ou"},
- iogurt_soja:{n:"Iogurt de soja",        cat:"prot", shop:"Refrigerats", uq:120, ul:"iogurt"},
- llet_ame:  {n:"Beguda d'ametlla",       cat:"prot", shop:"Sec", ml:true},
+ ou:        {n:"Ou",                     cat:"prot", shop:"Refrigerats",
+             uq:55, ul:"ou", ug:"m", umides:true},
+ iogurt_soja:{n:"Iogurt de soja",        cat:"prot", shop:"Refrigerats",
+             uq:120, ul:"iogurt", ug:"m"},
+ llet_ame:  {n:"Beguda d'ametlla",       cat:"prot", shop:"Sec", ml:true,
+             uq:250, ul:"got", ug:"m"},
 /* ---- HIDRATS ---- */
- patata:    {n:"Patata",                 cat:"hc", shop:"Verdura", uq:150, ul:"patata mitjana", nota:"pes en cru"},
- moniato:   {n:"Moniato",                cat:"hc", shop:"Verdura", uq:250, ul:"moniato", nota:"pes en cru"},
- quinoa:    {n:"Quinoa",                 cat:"hc", shop:"Sec", nota:"pes en sec"},
- arros:     {n:"Arròs",                  cat:"hc", shop:"Sec", nota:"pes en sec"},
+ patata:    {n:"Patata",                 cat:"hc", shop:"Verdura", nota:"pes en cru",
+             uq:150, ul:"patata", ug:"f", umides:true},
+ moniato:   {n:"Moniato",                cat:"hc", shop:"Verdura", nota:"pes en cru",
+             uq:250, ul:"moniato", ug:"m", umides:true},
+ quinoa:    {n:"Quinoa",                 cat:"hc", shop:"Sec", nota:"pes en sec",
+             uq:20, ul:"cullerada sopera", ulp:"cullerades soperes", ug:"f"},
+ arros:     {n:"Arròs",                  cat:"hc", shop:"Sec", nota:"pes en sec",
+             uq:20, ul:"cullerada sopera", ulp:"cullerades soperes", ug:"f"},
  pasta:     {n:"Pasta integral",         cat:"hc", shop:"Sec", nota:"pes en sec"},
- pa:        {n:"Pa integral",            cat:"hc", shop:"Fleca"},
- avena:     {n:"Flocs de civada",        cat:"hc", shop:"Sec"},
- datils:    {n:"Dàtils sense os",        cat:"hc", shop:"Sec"},
- mel:       {n:"Mel",                    cat:"hc", shop:"Sec", uq:15, ul:"cullerada"},
+ pa:        {n:"Pa integral",            cat:"hc", shop:"Fleca",
+             uq:30, ul:"llesca", ulp:"llesques", ug:"f"},
+ avena:     {n:"Flocs de civada",        cat:"hc", shop:"Sec",
+             uq:80, ul:"got", ug:"m"},
+ datils:    {n:"Dàtils sense os",        cat:"hc", shop:"Sec",
+             uq:10, ul:"dàtil", ug:"m"},
+ mel:       {n:"Mel",                    cat:"hc", shop:"Sec",
+             uq:15, ul:"cullerada", ug:"f"},
 /* ---- VERDURA CRUA ---- */
- tomaquet:  {n:"Tomàquet",               cat:"verd_c", shop:"Verdura"},
- canonges:  {n:"Canonges",               cat:"verd_c", shop:"Verdura"},
- cogombre:  {n:"Cogombre",               cat:"verd_c", shop:"Verdura"},
- pastanaga: {n:"Pastanaga",              cat:"verd_c", shop:"Verdura"},
+ tomaquet:  {n:"Tomàquet",               cat:"verd_c", shop:"Verdura",
+             uq:120, ul:"tomàquet", ug:"m", umides:true},
+ canonges:  {n:"Canonges",               cat:"verd_c", shop:"Verdura",
+             uq:40, ul:"grapat", ug:"m"},
+ cogombre:  {n:"Cogombre",               cat:"verd_c", shop:"Verdura",
+             uq:200, ul:"cogombre", ug:"m", umides:true},
+ pastanaga: {n:"Pastanaga",              cat:"verd_c", shop:"Verdura",
+             uq:80, ul:"pastanaga", ulp:"pastanagues", ug:"f", umides:true},
 /* ---- VERDURA CUINADA ---- */
- carbasso:  {n:"Carbassó",               cat:"verd_k", shop:"Verdura"},
- pebrot:    {n:"Pebrot",                 cat:"verd_k", shop:"Verdura"},
- broquil:   {n:"Bròquil",                cat:"verd_k", shop:"Verdura"},
- alberginia:{n:"Albergínia",             cat:"verd_k", shop:"Verdura"},
- xampinyons:{n:"Xampinyons",             cat:"verd_k", shop:"Verdura"},
- espinacs:  {n:"Espinacs",               cat:"verd_k", shop:"Verdura"},
- ceba:      {n:"Ceba",                   cat:"verd_k", shop:"Verdura"},
+ carbasso:  {n:"Carbassó",               cat:"verd_k", shop:"Verdura",
+             uq:200, ul:"carbassó", ug:"m", umides:true},
+ pebrot:    {n:"Pebrot",                 cat:"verd_k", shop:"Verdura",
+             uq:150, ul:"pebrot", ug:"m", umides:true},
+ broquil:   {n:"Bròquil",                cat:"verd_k", shop:"Verdura",
+             uq:50, ul:"floret", ug:"m"},
+ alberginia:{n:"Albergínia",             cat:"verd_k", shop:"Verdura",
+             uq:250, ul:"albergínia", ulp:"albergínies", ug:"f", umides:true},
+ xampinyons:{n:"Xampinyons",             cat:"verd_k", shop:"Verdura",
+             uq:20, ul:"xampinyó", ulp:"xampinyons", ug:"m"},
+ espinacs:  {n:"Espinacs",               cat:"verd_k", shop:"Verdura",
+             uq:40, ul:"grapat", ug:"m"},
+ ceba:      {n:"Ceba",                   cat:"verd_k", shop:"Verdura",
+             uq:120, ul:"ceba", ulp:"cebes", ug:"f", umides:true},
 /* ---- GREIXOS ---- */
- aove:      {n:"Oli d'oliva verge extra",cat:"greix", shop:"Sec", uq:10, ul:"cullerada", ml:true},
- sesam:     {n:"Sèsam triturat",         cat:"greix", shop:"Sec", uq:9,  ul:"cullerada"},
- lli:       {n:"Lli triturat",           cat:"greix", shop:"Sec", uq:9,  ul:"cullerada"},
- ametlles:  {n:"Ametlles",               cat:"greix", shop:"Sec", uq:40, ul:"grapat"},
- cacauets:  {n:"Cacauets",               cat:"greix", shop:"Sec", uq:40, ul:"grapat"},
- nous:      {n:"Nous",                   cat:"greix", shop:"Sec", uq:30, ul:"grapat"},
- tahini:    {n:"Tahini (crema de sèsam)",cat:"greix", shop:"Sec", uq:15, ul:"cullerada"},
- crema_ame: {n:"Crema d'ametlles",       cat:"greix", shop:"Sec", uq:25, ul:"cullerada"},
- alvocat:   {n:"Alvocat",                cat:"greix", shop:"Verdura", uq:150, ul:"alvocat"},
+ aove:      {n:"Oli d'oliva verge extra",cat:"greix", shop:"Sec", ml:true,
+             uq:10, ul:"cullerada", ug:"f"},
+ sesam:     {n:"Sèsam triturat",         cat:"greix", shop:"Sec",
+             uq:9,  ul:"cullerada", ug:"f"},
+ lli:       {n:"Lli triturat",           cat:"greix", shop:"Sec",
+             uq:9,  ul:"cullerada", ug:"f"},
+ ametlles:  {n:"Ametlles",               cat:"greix", shop:"Sec",
+             uq:40, ul:"grapat", ug:"m"},
+ cacauets:  {n:"Cacauets",               cat:"greix", shop:"Sec",
+             uq:40, ul:"grapat", ug:"m"},
+ nous:      {n:"Nous",                   cat:"greix", shop:"Sec",
+             uq:30, ul:"grapat", ug:"m"},
+ tahini:    {n:"Tahini (crema de sèsam)",cat:"greix", shop:"Sec",
+             uq:15, ul:"cullerada", ug:"f"},
+ crema_ame: {n:"Crema d'ametlles",       cat:"greix", shop:"Sec",
+             uq:25, ul:"cullerada", ug:"f"},
+ alvocat:   {n:"Alvocat",                cat:"greix", shop:"Verdura",
+             uq:150, ul:"alvocat", ug:"m", umides:true},
 /* ---- FRUITA ---- */
- poma:      {n:"Poma",                   cat:"fruita", shop:"Fruita", uq:180, ul:"poma"},
- platan:    {n:"Plàtan",                 cat:"fruita", shop:"Fruita", uq:120, ul:"plàtan"},
- taronja:   {n:"Taronja",                cat:"fruita", shop:"Fruita", uq:200, ul:"taronja"},
- pera:      {n:"Pera",                   cat:"fruita", shop:"Fruita", uq:170, ul:"pera"},
- kiwi:      {n:"Kiwi",                   cat:"fruita", shop:"Fruita", uq:90,  ul:"kiwi"},
- maduixes:  {n:"Maduixes",               cat:"fruita", shop:"Fruita"},
- nabius:    {n:"Nabius",                 cat:"fruita", shop:"Fruita"},
- mango:     {n:"Mango",                  cat:"fruita", shop:"Fruita"},
- press:     {n:"Préssec",                cat:"fruita", shop:"Fruita", uq:150, ul:"préssec"},
- llimona:   {n:"Llimona",                cat:"fruita", shop:"Fruita", uq:100, ul:"llimona"},
+ poma:      {n:"Poma",                   cat:"fruita", shop:"Fruita",
+             uq:180, ul:"poma", ug:"f", umides:true},
+ platan:    {n:"Plàtan",                 cat:"fruita", shop:"Fruita",
+             uq:120, ul:"plàtan", ug:"m", umides:true},
+ taronja:   {n:"Taronja",                cat:"fruita", shop:"Fruita",
+             uq:200, ul:"taronja", ulp:"taronges", ug:"f", umides:true},
+ pera:      {n:"Pera",                   cat:"fruita", shop:"Fruita",
+             uq:170, ul:"pera", ug:"f", umides:true},
+ kiwi:      {n:"Kiwi",                   cat:"fruita", shop:"Fruita",
+             uq:90,  ul:"kiwi", ug:"m", umides:true},
+ maduixes:  {n:"Maduixes",               cat:"fruita", shop:"Fruita",
+             uq:15, ul:"maduixa", ulp:"maduixes", ug:"f"},
+ nabius:    {n:"Nabius",                 cat:"fruita", shop:"Fruita",
+             uq:50, ul:"grapat", ug:"m"},
+ mango:     {n:"Mango",                  cat:"fruita", shop:"Fruita",
+             uq:300, ul:"mango", ug:"m", umides:true},
+ press:     {n:"Préssec",                cat:"fruita", shop:"Fruita",
+             uq:150, ul:"préssec", ug:"m", umides:true},
+ llimona:   {n:"Llimona",                cat:"fruita", shop:"Fruita",
+             uq:100, ul:"llimona", ulp:"llimones", ug:"f", umides:true},
 /* ---- CONDIMENTS ---- */
- all:       {n:"All",                    cat:"cond", shop:"Verdura", uq:4, ul:"gra"},
- comi:      {n:"Comí mòlt",              cat:"cond", shop:"Espècies", uq:2, ul:"culleradeta"},
- pebre_v:   {n:"Pebre vermell dolç",     cat:"cond", shop:"Espècies", uq:2, ul:"culleradeta"},
- sal:       {n:"Sal marina",             cat:"cond", shop:"Espècies", uq:3, ul:"culleradeta"},
- julivert:  {n:"Julivert",               cat:"cond", shop:"Verdura"},
- vinagre:   {n:"Vinagre",                cat:"cond", shop:"Sec", ml:true},
- cacau:     {n:"Cacau pur en pols",      cat:"cond", shop:"Sec", uq:5, ul:"culleradeta"},
- salsa_soja:{n:"Salsa de soja",          cat:"cond", shop:"Sec", uq:10, ul:"cullerada", ml:true},
+ all:       {n:"All",                    cat:"cond", shop:"Verdura",
+             uq:4, ul:"gra", ulp:"grans", ug:"m"},
+ comi:      {n:"Comí mòlt",              cat:"cond", shop:"Espècies",
+             uq:2, ul:"culleradeta", ug:"f"},
+ pebre_v:   {n:"Pebre vermell dolç",     cat:"cond", shop:"Espècies",
+             uq:2, ul:"culleradeta", ug:"f"},
+ sal:       {n:"Sal marina",             cat:"cond", shop:"Espècies",
+             uq:3, ul:"culleradeta", ug:"f"},
+ julivert:  {n:"Julivert",               cat:"cond", shop:"Verdura",
+             uq:2, ul:"branqueta", ug:"f"},
+ vinagre:   {n:"Vinagre",                cat:"cond", shop:"Sec", ml:true,
+             uq:10, ul:"cullerada", ug:"f"},
+ cacau:     {n:"Cacau pur en pols",      cat:"cond", shop:"Sec",
+             uq:5, ul:"culleradeta", ug:"f"},
+ salsa_soja:{n:"Salsa de soja",          cat:"cond", shop:"Sec", ml:true,
+             uq:10, ul:"cullerada", ug:"f"},
 
 /* ---- ELABORACIONS ---- */
- hummus:{n:"Hummus casolà", cat:"prot", shop:"Elaboracions", uq:30, ul:"cullerada sopera",
+ hummus:{n:"Hummus casolà", cat:"prot", shop:"Elaboracions",
+   uq:30, ul:"cullerada sopera", ulp:"cullerades soperes", ug:"f",
    prep:{cigrons:62.5, tahini:9.4, all:1, llimona:9.4, aove:7, comi:0.3, sal:0.5},
    recepta:"400 g cigrons cuits · 60 g tahini · 2 grans d'all · suc d'1 llimona (60 ml) · 3 cullerades d'AOVE (45 ml) · ½ culleradeta de comí (2 g) · ½ culleradeta de sal (3 g) · 60-80 ml d'aigua freda. Triturar 1-2 minuts fins que quedi cremós. Decorar amb un raig d'oli, pebre vermell i julivert. 5 racions per a 5 dies."},
- boleta:{n:"Boleta energètica", cat:"hc", shop:"Elaboracions", uq:45, ul:"boleta",
+ boleta:{n:"Boleta energètica", cat:"hc", shop:"Elaboracions",
+   uq:45, ul:"boleta", ug:"f",
    prep:{avena:32.3, datils:32.3, llet_ame:17.2, tahini:16.1, cacau:2.2},
    recepta:"150 g de flocs de civada · 150 g de dàtils sense os · 80 ml de beguda d'ametlla · 75 g de tahini · 1½ cullerada de cacau pur. Triturar la civada fina, afegir els dàtils, incorporar la resta i triturar fins a tenir una massa compacta. Formar boletes de 45 g. Surten 12 unitats i es conserven 7 dies a la nevera."},
- gaspatxo:{n:"Gaspatxo", cat:"verd_c", shop:"Elaboracions", ml:true, uq:250, ul:"got",
+ gaspatxo:{n:"Gaspatxo", cat:"verd_c", shop:"Elaboracions", ml:true,
+   uq:250, ul:"got", ug:"m",
    prep:{tomaquet:70, cogombre:10, pebrot:8, ceba:3, aove:4, all:0.5, vinagre:1.5, sal:0.3},
    recepta:"Per 1 litre: 700 g de tomàquet · 100 g de cogombre · 80 g de pebrot · 30 g de ceba · 40 ml d'AOVE · 1 gra d'all · 15 ml de vinagre · sal. Triturar i colar."},
 };
@@ -463,15 +518,73 @@ function plural(s,n){
   return s.split(" ").map(w=> w.endsWith("a") ? w.slice(0,-1)+"es"
                             : w.endsWith("s") ? w : w+"s").join(" ");
 }
+
+/* ---------------------------------------------------------------------
+   6bis. UNITATS EQUIVALENTS
+   ---------------------------------------------------------------------
+   Un pes en grams és una bàscula; una unitat és un plat. "150 g de
+   patata" obliga a pesar, "una patata mitjana" es pot servir. Les dues
+   coses surten sempre juntes i el pes continua manant: la unitat només
+   hi és per fer-lo entenedor, i mai substitueix el gram.
+
+   Cada aliment pot portar:
+     uq      quant pesa una unitat
+     ul      com se'n diu una  ("patata", "cullerada", "grapat")
+     ulp     el plural, quan no s'obté afegint -s o -es ("taronges")
+     ug      "m" o "f", per dir "mig got" o "mitja cullerada"
+     umides  si admet mida: una patata pot ser petita, mitjana o gran;
+             una cullerada o un iogurt, no.
+
+   Tot això s'edita des de la Guia i es desa a S.editsIng, o sigui que
+   es sincronitza igual que la resta de criteris. Els valors que porta
+   el programa són orientatius: els ha de repassar la nutricionista.
+
+   Quan la quantitat no encaixa amb cap unitat raonable no s'inventa res
+   i només surten els grams. Val més no dir res que dir "1,1 patates",
+   que és una precisió falsa i convida a pesar-ho tot.
+   --------------------------------------------------------------------- */
+const MIDES = {
+  m: {p:["petit","petits"],  j:["mitjà","mitjans"],  g:["gran","grans"]},
+  f: {p:["petita","petites"], j:["mitjana","mitjanes"], g:["gran","grans"]},
+};
+const genere = x => (x && x.ug==="m") ? "m" : "f";
+function nomUnitat(x, n){
+  if(n===1) return x.ul;
+  return x.ulp || plural(x.ul, n);
+}
+/* Només la part de la unitat: "1 patata gran", "mitja cullerada"...
+   Cadena buida si no hi ha manera honesta de dir-ho. */
+function unitatTxt(k, g){
+  const x = ing(k);
+  if(!x || !x.uq || !x.ul || !(g>0)) return "";
+  const n = g / x.uq, gen = genere(x);
+  const mig = gen==="m" ? "mig" : "mitja";
+
+  if(x.umides){
+    /* Mitja peça es mira abans d'arrodonir: 0,5 arrodoneix a 1 i ens
+       menjaríem el cas de "mitja poma", que és dels més freqüents. */
+    if(n >= 0.34 && n <= 0.72) return mig + " " + x.ul;
+    /* Peces senceres: comptem peces i la mida absorbeix la diferència. */
+    const c = Math.round(n);
+    if(c < 1) return "";
+    const f = n / c;
+    if(f < 0.72 || f > 1.45) return "";        // massa lluny: només grams
+    const mida = f < 0.9 ? "p" : (f < 1.1 ? "j" : "g");
+    return fmtN(c) + " " + nomUnitat(x, c) + " " + MIDES[gen][mida][c===1 ? 0 : 1];
+  }
+
+  /* Mesures (cullerada, got, grapat, llesca): mitjos sí, mides no. */
+  const r = Math.round(n*2)/2;
+  if(r < 0.5 || Math.abs(n-r) >= 0.18) return "";
+  if(r === 0.5) return mig + " " + x.ul;
+  return fmtN(r) + " " + nomUnitat(x, r);
+}
 function qtyTxt(k,g){
   const x = ing(k); if(!x) return Math.round(g)+" g";
   const u = x.ml ? "ml" : "g";
   const val = Math.round(g*10)/10;
-  if(x.uq && x.ul){
-    const n = g/x.uq, r = Math.round(n*2)/2;
-    if(r>=1 && Math.abs(n-r)<0.26) return fmtN(r)+" "+plural(x.ul,r)+" ("+val+" "+u+")";
-  }
-  return val+" "+u;
+  const un = unitatTxt(k, g);
+  return un ? un+" ("+val+" "+u+")" : val+" "+u;
 }
 function shopRound(g){
   if(g>=200) return Math.ceil(g/25)*25;
@@ -1509,6 +1622,7 @@ if (typeof module !== "undefined") module.exports = {
   loadState, saveState, allIng, ing, DISHES, dishById, iso, monday, addDays,
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,
+  unitatTxt, nomUnitat, MIDES, plural,
   qtyRef, fruitPieces, postresAlternades, esValidat, TODAY, fmtDay, fmtLong,
   parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,

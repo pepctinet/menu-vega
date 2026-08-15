@@ -2479,11 +2479,17 @@ function blocRacions(){
       <table>`;
     for(const [ak,a] of Object.entries(g.aliments)){
       const nom = ing(ak) ? ing(ak).n : ak;
+      const eq  = unitatTxt(ak, a.g);
       h += `<tr><td>${esc(nom)}
           ${a.nota?`<div class="xs muted">${esc(a.nota)}</div>`:""}
           ${a.font==="equivalent"?'<span class="tag">deduïda</span>':""}
           ${a.font==="editat"?'<span class="tag blau">canviada</span>':""}
-          ${a.font==="afegida"?'<span class="tag">afegida</span>':""}</td>
+          ${a.font==="afegida"?'<span class="tag">afegida</span>':""}
+          <div class="xs muted" style="margin-top:2px">
+            ${eq ? "que són "+esc(eq) : "sense unitat equivalent"}
+            <button class="btn ghost sm no-print" style="margin-left:6px;padding:0 7px"
+              onclick="editarUnitat('${esc(ak)}')"
+              title="Definir com se'n diu una unitat">unitat</button></div></td>
         <td style="width:150px;text-align:right">
           <input type="number" step="5" min="1" id="rac_${k}_${ak}" value="${a.g}"
             style="width:78px;padding:4px 6px;border:1px solid var(--linia);border-radius:7px;text-align:right">
@@ -2551,6 +2557,83 @@ function retirarDelGrup(grup, k){
   apuntarRacions(); tocarConfig(); render();
 }
 
+/* =====================================================================
+   UNITATS EQUIVALENTS
+   ---------------------------------------------------------------------
+   Els grams són per a la bàscula; les unitats són per a la cuina. Un
+   plat es defineix i es serveix molt millor amb "una patata mitjana i
+   dues cullerades d'oli" que amb "150 g i 20 ml", i ella pot seguir el
+   menú sense pesar res. Les dues coses surten sempre juntes.
+
+   Això NO és un criteri nutricional: no canvia cap ració ni cap
+   valoració, només com s'escriu una quantitat. Per això no passa per
+   l'històric datat (apuntarRacions) i s'aplica de seguida.
+
+   Els valors que porta el programa són orientatius i els hauria de
+   repassar la nutricionista, sobretot els pesos d'una peça.
+   ===================================================================== */
+function editarUnitat(k){
+  const x = ing(k); if(!x) return;
+  const gen = (x.ug==="m") ? "m" : "f";
+  const u = x.ml ? "ml" : "g";
+  openModal(`<div class="mhead"><div><h3>Unitat de ${esc(x.n.toLowerCase())}</h3>
+    <div class="small muted">Perquè al costat dels grams hi surti una mesura de cuina.
+      El pes continua manant: la unitat només serveix per entendre'l.</div></div>
+    <button class="close" onclick="closeModal()">×</button></div>
+    <div class="mbody">
+      <div class="xs muted" style="margin-bottom:4px">Com se'n diu una</div>
+      <input class="search" id="un_ul" value="${esc(x.ul||"")}"
+        placeholder="patata, cullerada, llesca, got, grapat...">
+      <div class="xs muted" style="margin:10px 0 4px">I com se'n diuen dues</div>
+      <input class="search" id="un_ulp" value="${esc(x.ulp || (x.ul ? plural(x.ul,2) : ""))}"
+        placeholder="patates">
+      <div class="xs muted" style="margin:10px 0 4px">Se'n diu...</div>
+      <select class="search" id="un_ug">
+        <option value="f"${gen==="f"?" selected":""}>una / mitja  (femení)</option>
+        <option value="m"${gen==="m"?" selected":""}>un / mig  (masculí)</option>
+      </select>
+      <div class="xs muted" style="margin:10px 0 4px">Quant pesa una, en ${u}</div>
+      <input class="search" type="number" id="un_uq" min="1" step="1" value="${x.uq||""}">
+      <label class="row" style="gap:8px;margin-top:12px;align-items:flex-start">
+        <input type="checkbox" id="un_mides"${x.umides?" checked":""} style="margin-top:4px">
+        <span class="small">Admet mida
+          <div class="xs muted">Marca-ho per a les peces que poden ser petites, mitjanes o
+            grans: una patata, una poma, un tomàquet. No ho marquis per a mesures com una
+            cullerada, un got o un grapat, que no tenen mida.</div></span></label>
+      <button class="btn" style="margin-top:14px" onclick="desarUnitat('${esc(k)}')">Desar</button>
+      ${x.uq?`<button class="btn ghost" style="margin-top:9px"
+        onclick="treureUnitat('${esc(k)}')">Treure la unitat</button>`:""}
+      <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button>
+    </div>`, true);
+}
+/* Els aliments que porta el programa es modifiquen a S.editsIng; els
+   creats des del configurador viuen sencers a S.customIng. */
+function tocarIngredient(k, dades){
+  if(S.customIng && S.customIng[k]) Object.assign(S.customIng[k], dades);
+  else { S.editsIng = S.editsIng || {};
+         S.editsIng[k] = Object.assign({}, S.editsIng[k], dades); }
+}
+function desarUnitat(k){
+  const ul = ($("#un_ul").value||"").trim();
+  const uq = +$("#un_uq").value || 0;
+  if(!ul || uq<=0) return alert("Cal el nom de la unitat i quant pesa.");
+  const x = ing(k), u = (x && x.ml) ? "ml" : "g";
+  const ug = $("#un_ug").value==="m" ? "m" : "f";
+  tocarIngredient(k, {ul, ulp:($("#un_ulp").value||"").trim() || plural(ul,2),
+                      ug, uq, umides: !!$("#un_mides").checked});
+  apuntarCanvi("Ha definit la unitat de «"+(x?x.n:k)+"»: "+
+               (ug==="m"?"un ":"una ")+ul+" = "+uq+" "+u);
+  tocarConfig(); closeModal(); render();
+}
+function treureUnitat(k){
+  const x = ing(k);
+  if(!confirm("Treure la unitat de «"+(x?x.n:k)+"»?\n\n"+
+    "Les quantitats tornaran a sortir només en grams.")) return;
+  tocarIngredient(k, {ul:null, ulp:null, uq:null, umides:false});
+  apuntarCanvi("Ha tret la unitat equivalent de «"+(x?x.n:k)+"»");
+  tocarConfig(); closeModal(); render();
+}
+
 /* Les receptes fixes dels àpats petits */
 function editarApatFix(mealId){
   const F = apatsFixos()[mealId]; if(!F) return;
@@ -2559,10 +2642,13 @@ function editarApatFix(mealId){
     <input class="search" id="af_ajuda" value="${esc(F.ajuda||"")}">`;
   const files = [];
   for(const [k,q] of Object.entries(F.cal||{}))
-    files.push([`af_cal_${k}`, (ing(k)?ing(k).n:k)+" — sempre", q, ing(k)&&ing(k).ml?"ml":"g"]);
+    files.push([`af_cal_${k}`, (ing(k)?ing(k).n:k)+" — sempre", q,
+                ing(k)&&ing(k).ml?"ml":"g", unitatTxt(k,q)]);
   for(const [c,q] of Object.entries(F.min||{}))
-    files.push([`af_min_${c}`, c==="fruita"?"Fruita, com a mínim":"Hidrats, com a mínim", q, "g"]);
-  cos += files.map(([id,nom,v,u])=>`<div class="qrow"><span class="nm">${esc(nom)}</span>
+    files.push([`af_min_${c}`, c==="fruita"?"Fruita, com a mínim":"Hidrats, com a mínim",
+                q, "g", ""]);
+  cos += files.map(([id,nom,v,u,eq])=>`<div class="qrow"><span class="nm">${esc(nom)}
+    ${eq?`<div class="xs muted">que són ${esc(eq)}</div>`:""}</span>
     <input type="number" id="${id}" value="${v}" min="0" step="5"><span class="un">${u}</span></div>`).join("");
   openModal(`<div class="mhead"><div><h3>${esc(m.n)}</h3>
     <div class="small muted">Aquests números són els que fa servir l'aplicatiu per dir
@@ -2703,7 +2789,7 @@ function viewGuia(){
       return `<tr><td class="qty" style="width:70px">${esc(m.h)}</td><td><b>${esc(m.n)}</b>
         ${F?`<div class="xs muted">${esc(F.ajuda||"")}</div>
           ${Object.keys(F.cal||{}).length?`<div class="xs">Sempre: ${
-            Object.entries(F.cal).map(([k,q])=>esc((ing(k)?ing(k).n:k)+" "+q+(ing(k)&&ing(k).ml?" ml":" g"))).join(" · ")}</div>`:""}
+            Object.entries(F.cal).map(([k,q])=>esc((ing(k)?ing(k).n:k)+" "+qtyTxt(k,q))).join(" · ")}</div>`:""}
           <button class="btn ghost sm no-print" style="margin-top:5px"
             onclick="editarApatFix('${m.id}')">Canviar les quantitats</button>`
         :`<div class="xs muted">Es mesura per racions (a sota)</div>`}</td></tr>`;
