@@ -393,7 +393,7 @@ function pintar(){
 }
 
 function pintarHabits(day){
-  return `<div class="habits">`+HABITS.map(x=>
+  return `<div class="habits">`+habits().map(x=>
     `<button class="hb ${day.habits.includes(x.id)?"on":""}" onclick="ferHabit('${x.id}')">
       ${day.habits.includes(x.id)?"✓ ":""}${esc(x.n)}</button>`).join("")+`</div>`;
 }

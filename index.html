@@ -101,6 +101,10 @@ textarea.msgbox{width:100%;padding:12px 14px;border:1px solid var(--linia);borde
  font-weight:600;background:var(--verd-clar);color:var(--verd-fosc)}
 .tag.blau{background:#e6eef5;color:#3a5a75}
 .tag.groc{background:var(--groc-clar);color:#8a6410}
+/* Plats desactivats: es veuen, es poden editar i actualitzar, però no
+   entren a la tria. Han de distingir-se d'un cop d'ull. */
+.dish.retirat{background:#f2f0e8;opacity:.72}
+.dish.retirat .t{text-decoration:line-through;text-decoration-color:#b9b5a6}
 /* Avís dels canvis que la reprogramació en cadena ha fet sola */
 .avis{background:var(--groc-clar);border:1px solid #eddcae;border-radius:10px;
  padding:11px 13px;margin-bottom:12px}
@@ -770,7 +774,7 @@ function obrirDia(ds){
   h += `</table>`;
 
   h += `<div class="sec-title"><h2 style="font-size:15px">Indicacions d'hàbits</h2></div><div class="inds">`+
-    HABITS.map(x=>`<button class="ind ${day.habits.includes(x.id)?"on":""}"
+    habits().map(x=>`<button class="ind ${day.habits.includes(x.id)?"on":""}"
       onclick="toggleHabit('${ds}','${x.id}')">${day.habits.includes(x.id)?"✓":"○"} ${esc(x.n)}</button>`)
     .join("")+`</div>`;
 
@@ -969,10 +973,41 @@ function viewConfigurador(){
     if(t.desconeguts) h += `<div class="xs muted" style="margin:-6px 0 8px">
       ${t.desconeguts} aliment${t.desconeguts>1?"s":""} sense valors nutricionals: no compten al total.</div>`;
   }
+  /* Quan un plat no quadra s'ha de veure igual de clar que quan sí. Abans
+     l'etiqueta verda desapareixia i el que faltava quedava en gris petit,
+     de manera que semblava que no deia res. */
   h += c.complet
     ? `<div style="margin:10px 0"><span class="eq">Equilibrat com a ${mealRef}</span></div>`
-    : `<div class="small muted" style="margin:10px 0">Com a ${mealRef}, hi pots afegir:
-       ${c.falten.map(esc).join(" · ")||"—"}</div>`;
+    : `<div class="avis" style="margin:10px 0">
+         <h3>Com a ${esc(mealRef)}, hi falta:</h3>
+         <div class="small" style="color:#8a6410">${c.falten.map(esc).join(" · ")||"—"}</div>
+       </div>`;
+
+  /* El recompte de racions, sempre. És el que explica per què un plat
+     compleix o no: si la nutricionista ha canviat una quantitat, aquí es
+     veu de seguida, en comptes d'haver-ho d'endevinar. */
+  if(mealRef==="dinar" || mealRef==="sopar"){
+    const R = racions(), rc = racionsDe(cfg.i).total;
+    const dif = new Set((racionsDe(cfg.i).perGrup.greix||[])
+      .filter(x=>x.racions>=0.4).map(x=>x.k));
+    const fila = (nom, te, cal, extra) => {
+      const ok = te >= cal*0.85;
+      return `<span class="row" style="gap:5px">
+        <span class="dot ${ok?"v":"g"}"></span>
+        <span class="xs">${esc(nom)} <b>${fmtN(te)}</b> de ${cal}${extra||""}</span></span>`;
+    };
+    h += `<div class="small muted" style="margin:-4px 0 10px;display:flex;gap:14px;flex-wrap:wrap">
+      ${fila("proteïna", rc.prot||0, (R.prot&&R.prot.perApat)||1)}
+      ${fila("hidrats", rc.hc||0, (R.hc&&R.hc.perApat)||1)}
+      ${fila("verdura", rc.verd||0, (R.verd&&R.verd.perApat)||2)}
+      <span class="row" style="gap:5px">
+        <span class="dot ${dif.size>=((R.greix&&R.greix.perApat)||2)?"v":"g"}"></span>
+        <span class="xs">greixos diferents <b>${dif.size}</b> de ${(R.greix&&R.greix.perApat)||2}</span></span>
+      </div>
+      <div class="xs muted" style="margin:-6px 0 10px">racions, segons
+        <b>Plats → Quantitats per ració</b>. Una ració de patata són ara
+        ${(racions().hc.aliments.patata||{}).g||"?"} g.</div>`;
+  }
 
   h += `<div style="margin-top:14px;border-top:1px solid var(--linia);padding-top:12px">
       <input class="search" id="cfg_n" placeholder="Nom del plat" value="${esc(cfg.n)}"
@@ -1003,7 +1038,7 @@ function viewConfigurador(){
         <div class="info"><div class="t">${esc(d.n)}</div>
         <div class="ing">${esc(ingList(d.i))}</div>
         <div class="mac">${d.m.map(x=>(MEALS.find(y=>y.id===x)||{n:x}).n).join(", ")}</div></div>
-        <button class="btn danger sm" onclick="event.stopPropagation();esborrarPlat('${d.id}')">esborrar</button>
+        <button class="btn danger sm" onclick="event.stopPropagation();retirarPlat('${d.id}')">desactivar</button>
         </div>`;}).join("")+`</div></div>`;
   }
 
@@ -1029,13 +1064,9 @@ function viewConfigurador(){
     `</div>`;
   return h;
 }
-function checkMealItems(items, mealId){
-  const tmp = {id:"__tmp", n:"", m:[mealId], i:items};
-  BASE_DISHES.push(tmp);
-  const r = checkMeal("__tmp", mealId);
-  BASE_DISHES.pop();
-  return r;
-}
+/* Abans això empenyia un plat fals dins de BASE_DISHES i el treia
+   després. Ara checkItems() ja accepta els ingredients directament. */
+function checkMealItems(items, mealId){ return checkItems(items, mealId); }
 function cfgToggle(k){
   if(cfg.i[k]!==undefined) delete cfg.i[k];
   else cfg.i[k] = qtyRef(k);
@@ -1076,19 +1107,29 @@ function restaurarPlat(id){
   apuntarCanvi("Ha restaurat el plat original «"+(d?d.n:id)+"»");
   tocarConfig(); render();
 }
+/* Desactivar no és esborrar. Un plat desactivat es queda a la llista,
+   al final i ombrejat, se li apliquen les mateixes quantitats i el mateix
+   botó d'actualitzar, i es pot tornar a activar quan es vulgui. És el que
+   permet anar rotant variacions sense perdre res.
+   Abans, els plats afegits per l'usuari s'esborraven de debò. */
 function retirarPlat(id){
   const d = dishById(id);
-  const base = esPlatBase(id);
-  if(!confirm(base
-      ? "Retirar «"+d.n+"»? Deixarà de sortir a les llistes, però el podràs recuperar quan vulguis."
-      : "Esborrar «"+d.n+"»? Aquest l'has afegit tu i s'esborra del tot.")) return;
-  if(base){
-    S.platsAmagats = [...new Set([...(S.platsAmagats||[]), id])];
-    apuntarCanvi("Ha retirat el plat «"+d.n+"»");
-  } else {
-    S.custom = S.custom.filter(x=>x.id!==id);
-    apuntarCanvi("Ha esborrat el plat «"+d.n+"»");
-  }
+  if(!confirm("Desactivar «"+d.n+"»?\n\n"+
+    "Deixarà de sortir a la tria i a l'aplicació d'ella, però es quedarà al final "+
+    "de la llista de plats i el podràs tornar a activar quan vulguis.")) return;
+  S.platsAmagats = [...new Set([...(S.platsAmagats||[]), id])];
+  apuntarCanvi("Ha desactivat el plat «"+d.n+"»");
+  tocarConfig(); render();
+}
+/* Esborrar del tot: només per als plats afegits per l'usuari, i només
+   quan ja estan desactivats. Els que porta el programa no s'esborren mai. */
+function esborrarPlatDelTot(id){
+  const d = dishById(id);
+  if(esPlatBase(id)) return alert("Els plats que porta el programa no s'esborren; es desactiven.");
+  if(!confirm("Esborrar «"+d.n+"» del tot?\n\nAixò no es pot desfer.")) return;
+  S.custom = (S.custom||[]).filter(x=>x.id!==id);
+  S.platsAmagats = (S.platsAmagats||[]).filter(x=>x!==id);
+  apuntarCanvi("Ha esborrat el plat «"+d.n+"»");
   tocarConfig(); render();
 }
 function tornarPlat(id){
@@ -1185,12 +1226,18 @@ function viewPlats(){
   let h = `<div class="sec-title"><h2>Plats, receptes i quantitats</h2>
     <span class="muted small">Tot el que hi ha al programa es pot canviar</span>
     <span style="margin-left:auto" class="no-print">`+
-    [["plats","Plats"],["receptes","Receptes"],["racions","Quantitats per ració"],["canvis","Registre de canvis"]]
+    [["plats","Plats"],["receptes","Receptes"],["canvis","Registre de canvis"]]
       .map(([k,n])=>`<button class="btn ${seccioPlats===k?"":"ghost"} sm"
         onclick="seccioPlats='${k}';render()">${n}</button>`).join(" ")+
     `</span></div>`;
   if(seccioPlats==="receptes") return h + seccioReceptes();
-  if(seccioPlats==="racions")  return h + seccioRacions();
+  /* Les quantitats per ració ja no s'editen aquí: viuen a la Guia, que és
+     l'única pantalla on es toquen els criteris. */
+  if(seccioPlats==="racions")  return h + `<div class="card pad">
+    <div class="small">Les <b>quantitats per ració</b> es canvien ara a la pestanya
+    <b>Guia</b>, juntament amb els hàbits i la resta d'indicacions. Així hi ha un sol
+    lloc on tocar-les.</div>
+    <button class="btn" style="margin-top:12px" onclick="tab='guia';render()">Anar a la Guia</button></div>`;
   if(seccioPlats==="canvis")   return h + seccioCanvis();
 
   /* --- llistat de plats --- */
@@ -1198,11 +1245,18 @@ function viewPlats(){
   const actius = tots.filter(d=>!d.amagat);
   const retirats = tots.filter(d=>d.amagat);
   const q = cercaPlats.toLowerCase().trim();
-  let list = actius;
-  if(filtrePlats!=="tots") list = list.filter(d=>d.m.includes(filtrePlats));
-  if(q) list = list.filter(d=>d.n.toLowerCase().includes(q) ||
-      Object.keys(d.i).some(k=>ing(k)&&ing(k).n.toLowerCase().includes(q)));
-  list = list.slice().sort((a,b)=>a.n.localeCompare(b.n));
+  const filtra = arr => {
+    let l = arr;
+    if(filtrePlats!=="tots") l = l.filter(d=>d.m.includes(filtrePlats));
+    if(q) l = l.filter(d=>d.n.toLowerCase().includes(q) ||
+        Object.keys(d.i).some(k=>ing(k)&&ing(k).n.toLowerCase().includes(q)));
+    return l.slice().sort((a,b)=>a.n.localeCompare(b.n));
+  };
+  /* Els desactivats surten al final de la MATEIXA llista, amb el mateix
+     filtre d'àpat: si mires els plats de dinar, hi veus els de dinar
+     desactivats i prou. Se'ls apliquen les mateixes regles de quantitats
+     i el mateix botó d'actualitzar; només no entren a la tria. */
+  const list = filtra(actius), listOff = filtra(retirats);
 
   h += `<div class="card pad" style="margin-bottom:14px">
     <div class="row" style="flex-wrap:wrap;gap:8px">
@@ -1221,15 +1275,18 @@ function viewPlats(){
     `</div></div>`;
 
   h += `<div class="card pad"><div class="small muted" style="margin-bottom:10px">
-    ${list.length} plat${list.length===1?"":"s"}</div><div class="dishlist" style="max-height:none">`;
-  h += list.length ? list.map(d=>{
+    ${list.length} plat${list.length===1?"":"s"} en actiu${
+      listOff.length?` · ${listOff.length} desactivat${listOff.length===1?"":"s"} al final`:""}
+    </div><div class="dishlist" style="max-height:none">`;
+  h += (list.length||listOff.length) ? list.concat(listOff).map(d=>{
       const mealRef = d.m.includes("sopar")?"sopar":d.m[0];
       const f = (mealRef==="dinar"||mealRef==="sopar") ? faltaApat(d.i, mealRef) : checkMeal(d.id, mealRef);
       const ms = obert ? scoreMealFull(d.id, mealRef) : null;
-      return `<div class="dish" style="cursor:default">
+      return `<div class="dish${d.amagat?" retirat":""}" style="cursor:default">
         ${boleta(f.complet, false, "margin-top:6px")}
         <div class="info">
           <div class="t">${esc(d.n)}
+            ${d.amagat?'<span class="tag groc">desactivat</span>':""}
             ${d.base?"":'<span class="tag">afegit</span>'}
             ${d.editat?'<span class="tag blau">modificat</span>':""}
             ${d.src&&d.base&&!d.editat?`<span class="tag">${esc(d.src)}</span>`:""}</div>
@@ -1243,20 +1300,17 @@ function viewPlats(){
           <button class="btn ghost sm" onclick="cfgFrom('${d.id}')">editar</button>
           <button class="btn ghost sm" onclick="cfgFrom('${d.id}','duplicar')">duplicar</button>
           ${d.editat?`<button class="btn ghost sm" onclick="restaurarPlat('${d.id}')">original</button>`:""}
-          <button class="btn danger sm" onclick="retirarPlat('${d.id}')">${d.base?"retirar":"esborrar"}</button>
+          ${d.amagat
+            ? `<button class="btn sm" onclick="tornarPlat('${d.id}')">activar</button>`
+            : `<button class="btn ghost sm" onclick="retirarPlat('${d.id}')">desactivar</button>`}
+          ${d.amagat && !d.base
+            ? `<button class="btn danger sm" onclick="esborrarPlatDelTot('${d.id}')">esborrar</button>`:""}
         </div></div>`;
     }).join("") : `<div class="muted pad">Cap plat amb aquest filtre.</div>`;
   h += `</div></div>`;
 
-  if(retirats.length){
-    h += `<div class="sec-title"><h2>Plats retirats</h2>
-      <span class="muted small">no surten a les llistes, però es poden recuperar</span></div>
-      <div class="card pad"><table>`+
-      retirats.map(d=>`<tr><td>${esc(d.n)}</td>
-        <td class="xs muted">${esc(ingListShort(d.i,4))}</td>
-        <td style="width:110px"><button class="btn ghost sm" onclick="tornarPlat('${d.id}')">tornar-lo a posar</button></td>
-        </tr>`).join("")+`</table></div>`;
-  }
+  /* Els desactivats ja surten al final de la llista de dalt, amb el
+     mateix filtre d'àpat, en comptes d'una llista a part sense filtrar. */
   return h;
 }
 
@@ -1761,7 +1815,7 @@ function viewRegistre(){
           ${sx?`<span class="sup ${sx.omplert}" title="${esc(sx.n)}"></span>`:""}
           ${sd?`<span class="quad" style="background:${sd.color}" title="S'hi ha sentit ${esc(sd.n.toLowerCase())}"></span>`:""}</div>`;
       }).join("")+`</td>
-      <td class="xs muted">${day.habits.length}/${HABITS.length}</td>
+      <td class="xs muted">${day.habits.length}/${habits().length}</td>
       ${obert?`<td class="qty">${Math.round(sc.kcal)}</td><td class="qty">${Math.round(sc.prot)}</td>`:""}
       <td>${nf?`<button class="btn ghost sm" onclick="obrirDia('${ds}')">${nf} ◉</button>`:'<span class="muted xs">—</span>'}</td>
       </tr>`;
@@ -1781,7 +1835,7 @@ function exportarRegistre(){
       const d = dishById(day.meals[m.id]);
       if(d) txt += "  "+m.n.padEnd(10)+" "+d.n+"\n         "+ingList(d.i)+"\n";
     }
-    const hs = day.habits.map(id=>(HABITS.find(x=>x.id===id)||{n:id}).n);
+    const hs = day.habits.map(id=>nomHabit(id));
     if(hs.length) txt += "  Hàbits:  "+hs.join(" · ")+"\n";
   }
   navigator.clipboard.writeText(txt).then(
@@ -1821,7 +1875,7 @@ function analitzar(dies){
   };
   for(const m of MEALS){ r.sensPerApat[m.id] = {v:0,t:0,r:0, total:0};
     r.supPerApat[m.id] = {sup:0, prep:0, sola:0, total:0}; }
-  for(const h of HABITS) r.habits[h.id] = 0;
+  for(const h of habits()) r.habits[h.id] = 0;
 
   for(const [ds, day] of dies){
     const chk = checkDay(day);
@@ -1989,7 +2043,7 @@ function viewSeguiment(){
 
   /* --- hàbits --- */
   h += `<div class="sec-title"><h2>Indicacions d'hàbits</h2></div><div class="card pad"><table>`+
-    HABITS.map(x=>{
+    habits().map(x=>{
       const n = r.habits[x.id], p = r.nDies ? Math.round(n/r.nDies*100) : 0;
       return `<tr><td>${esc(x.n)}</td>
         <td class="qty" style="width:90px;text-align:right">${n} de ${r.nDies}</td>
@@ -2046,7 +2100,7 @@ function copiarSeguiment(){
     for(const a of r.adaptats) t += "  "+a.ds+" "+a.apat+": "+a.n+"\n";
   }
   t += "\nHÀBITS\n";
-  for(const x of HABITS) t += "  "+x.n.padEnd(42)+r.habits[x.id]+" de "+r.nDies+"\n";
+  for(const x of habits()) t += "  "+x.n.padEnd(42)+r.habits[x.id]+" de "+r.nDies+"\n";
   navigator.clipboard.writeText(t).then(()=>alert("Informe copiat."), ()=>prompt("Copia l'informe:", t));
 }
 
@@ -2356,59 +2410,272 @@ async function pintarGaleriaTot(){
 }
 
 /* =====================================================================
+   LA GUIA COM A EINA D'EDICIÓ
+   ---------------------------------------------------------------------
+   És l'única pantalla on es canvien els criteris. Editar un plat no toca
+   mai res d'aquí: els plats s'adapten als criteris, no al revés.
+   Tot passa pel registre de canvis, i les quantitats per l'històric datat
+   (apuntarRacions), que és el que fa que un canvi entri demà i que els
+   dies validats es quedin com estaven.
+   ===================================================================== */
+function blocRacions(){
+  const RG = racions();
+  const ordre = [["prot","Proteïnes"],["hc","Hidrats de carboni"],
+                 ["verd","Verdures"],["greix","Greixos saludables"],["fruita","Fruita"]];
+  let h = "";
+  for(const [k, titol] of ordre){
+    const g = RG[k]; if(!g) continue;
+    h += `<div class="card pad" style="margin-bottom:12px">
+      <div class="spread"><b style="font-size:15px">${esc(titol)}</b>
+        <span class="row" style="gap:6px"><span class="xs muted">racions per àpat principal</span>
+          <input type="number" step="1" min="0" id="rac_per_${k}" value="${g.perApat}"
+            style="width:58px;padding:4px 6px;border:1px solid var(--linia);border-radius:7px;text-align:right">
+        </span></div>
+      <div class="xs muted" style="margin:3px 0 10px">${esc(g.ajuda||"")}</div>
+      <table>`;
+    for(const [ak,a] of Object.entries(g.aliments)){
+      const nom = ing(ak) ? ing(ak).n : ak;
+      h += `<tr><td>${esc(nom)}
+          ${a.nota?`<div class="xs muted">${esc(a.nota)}</div>`:""}
+          ${a.font==="equivalent"?'<span class="tag">deduïda</span>':""}
+          ${a.font==="editat"?'<span class="tag blau">canviada</span>':""}
+          ${a.font==="afegida"?'<span class="tag">afegida</span>':""}</td>
+        <td style="width:150px;text-align:right">
+          <input type="number" step="5" min="1" id="rac_${k}_${ak}" value="${a.g}"
+            style="width:78px;padding:4px 6px;border:1px solid var(--linia);border-radius:7px;text-align:right">
+          <span class="xs muted">${ing(ak)&&ing(ak).ml?"ml":"g"}</span>
+          <button class="btn ghost sm no-print" style="margin-left:6px"
+            onclick="retirarDelGrup('${k}','${ak}')" title="Treure'l d'aquest grup">×</button></td></tr>`;
+    }
+    h += `</table>
+      <div class="row" style="margin-top:11px;gap:8px">
+        <button class="btn sm" onclick="desarRacions('${k}')">Desar ${esc(titol.toLowerCase())}</button>
+        <button class="btn ghost sm" onclick="afegirAlGrup('${k}')">+ Afegir un aliment</button>
+        ${S.racions[k]?`<button class="btn ghost sm" onclick="restaurarRacions('${k}')">Tornar a l'original</button>`:""}
+      </div></div>`;
+  }
+  return h;
+}
+
+/* Afegir un aliment a un grup de racions. Pot ser un que ja existeix i
+   encara no és a cap grup, o un de nou. Sense això, un aliment afegit des
+   del configurador comptava zero racions i el plat que el portés deia que
+   li faltava proteïna. */
+function afegirAlGrup(grup){
+  const R = racions();
+  const jaHi = new Set();
+  for(const g of Object.values(R)) for(const k of Object.keys(g.aliments)) jaHi.add(k);
+  const lliures = Object.entries(allIng())
+    .filter(([k]) => !jaHi.has(k))
+    .sort((a,b)=>a[1].n.localeCompare(b[1].n));
+  openModal(`<div class="mhead"><div><h3>Afegir un aliment a ${esc(R[grup].n.toLowerCase())}</h3>
+    <div class="small muted">Digues quina quantitat en fa una ració</div></div>
+    <button class="close" onclick="closeModal()">×</button></div>
+    <div class="mbody">
+      ${lliures.length ? `<div class="xs muted" style="margin-bottom:4px">Aliment</div>
+      <select class="search" id="ag_k" style="margin-bottom:10px">`+
+        lliures.map(([k,v])=>`<option value="${esc(k)}">${esc(v.n)}</option>`).join("")+
+      `</select>` : `<div class="small muted" style="margin-bottom:10px">
+        Tots els aliments que hi ha ja pertanyen a un grup. Crea'l primer des de
+        <b>Plats → Configurador</b> i torna aquí.</div>`}
+      ${lliures.length?`<div class="xs muted" style="margin-bottom:4px">Quantitat d'una ració</div>
+      <input class="search" type="number" id="ag_g" value="100" min="1" step="5">
+      <button class="btn" style="margin-top:12px" onclick="desarAfegitAlGrup('${grup}')">Afegir-lo</button>`:""}
+      <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button>
+    </div>`, true);
+}
+function desarAfegitAlGrup(grup){
+  const k = $("#ag_k").value, g = +$("#ag_g").value || 0;
+  if(!k || g<=0) return alert("Posa una quantitat.");
+  S.racions[grup] = S.racions[grup] || {aliments:{}};
+  S.racions[grup].aliments = S.racions[grup].aliments || {};
+  S.racions[grup].aliments[k] = {g};
+  apuntarCanvi("Ha afegit «"+(ing(k)?ing(k).n:k)+"» a "+racions()[grup].n.toLowerCase()+
+               " amb una ració de "+g+" g");
+  apuntarRacions(); tocarConfig(); closeModal(); render();
+}
+function retirarDelGrup(grup, k){
+  const nom = ing(k) ? ing(k).n : k;
+  if(!confirm("Treure «"+nom+"» d'aquest grup?\n\n"+
+     "L'aliment no s'esborra i els plats antics el continuaran mostrant, però deixarà "+
+     "de comptar com a ració. Els plats que només el porten a ell passaran a no complir, "+
+     "i el botó «Actualitzar als criteris nous» t'ho reportarà.")) return;
+  S.racions[grup] = S.racions[grup] || {aliments:{}};
+  S.racions[grup].aliments = S.racions[grup].aliments || {};
+  S.racions[grup].aliments[k] = {retirat:true};
+  apuntarCanvi("Ha retirat «"+nom+"» de "+racions()[grup].n.toLowerCase());
+  apuntarRacions(); tocarConfig(); render();
+}
+
+/* Les receptes fixes dels àpats petits */
+function editarApatFix(mealId){
+  const F = apatsFixos()[mealId]; if(!F) return;
+  const m = MEALS.find(x=>x.id===mealId);
+  let cos = `<div class="xs muted" style="margin-bottom:4px">Indicació</div>
+    <input class="search" id="af_ajuda" value="${esc(F.ajuda||"")}">`;
+  const files = [];
+  for(const [k,q] of Object.entries(F.cal||{}))
+    files.push([`af_cal_${k}`, (ing(k)?ing(k).n:k)+" — sempre", q, ing(k)&&ing(k).ml?"ml":"g"]);
+  for(const [c,q] of Object.entries(F.min||{}))
+    files.push([`af_min_${c}`, c==="fruita"?"Fruita, com a mínim":"Hidrats, com a mínim", q, "g"]);
+  cos += files.map(([id,nom,v,u])=>`<div class="qrow"><span class="nm">${esc(nom)}</span>
+    <input type="number" id="${id}" value="${v}" min="0" step="5"><span class="un">${u}</span></div>`).join("");
+  openModal(`<div class="mhead"><div><h3>${esc(m.n)}</h3>
+    <div class="small muted">Aquests números són els que fa servir l'aplicatiu per dir
+      si l'àpat està complet</div></div>
+    <button class="close" onclick="closeModal()">×</button></div>
+    <div class="mbody">${cos}
+      <button class="btn" style="margin-top:12px" onclick="desarApatFix('${mealId}')">Desar</button>
+      <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button></div>`);
+}
+function desarApatFix(mealId){
+  const F = apatsFixos()[mealId];
+  const c = {cal:{}, min:{}};
+  for(const k of Object.keys(F.cal||{})){ const el=$("#af_cal_"+k); if(el) c.cal[k]=+el.value||0; }
+  for(const k of Object.keys(F.min||{})){ const el=$("#af_min_"+k); if(el) c.min[k]=+el.value||0; }
+  const aj = $("#af_ajuda"); if(aj) c.ajuda = aj.value.trim();
+  S.apatsFixos = S.apatsFixos || {};
+  S.apatsFixos[mealId] = c;
+  apuntarCanvi("Ha canviat les quantitats de l'àpat «"+
+    (MEALS.find(x=>x.id===mealId)||{n:mealId}).n+"»");
+  tocarConfig(); closeModal(); render();
+}
+
+/* Indicacions en text */
+function blocIndicacions(){
+  const l = indicacions();
+  return `<div class="sec-title"><h2>Indicacions</h2>
+    <span style="margin-left:auto" class="no-print">
+      <button class="btn ghost sm" onclick="editarIndicacio()">+ Afegir-ne una</button></span></div>
+    <div class="card pad small">`+
+    (l.length ? l.map(x=>`<div class="spread" style="padding:6px 0;gap:10px">
+        <span>· ${esc(x.t)}</span>
+        <span class="row no-print" style="gap:5px;flex:none">
+          <button class="btn ghost sm" onclick="editarIndicacio('${esc(x.id)}')">editar</button>
+          <button class="btn ghost sm" onclick="retirarIndicacio('${esc(x.id)}')">×</button></span>
+      </div>`).join("") : `<div class="muted">Cap indicació escrita.</div>`)+`</div>`;
+}
+function editarIndicacio(id){
+  const x = id ? indicacions().find(y=>y.id===id) : null;
+  openModal(`<div class="mhead"><h3>${id?"Editar":"Nova"} indicació</h3>
+    <button class="close" onclick="closeModal()">×</button></div>
+    <div class="mbody">
+      <textarea class="search" id="ind_t" style="min-height:90px">${esc(x?x.t:"")}</textarea>
+      <button class="btn" style="margin-top:10px" onclick="desarIndicacio('${id?esc(id):""}')">Desar</button>
+      <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button></div>`, true);
+}
+function desarIndicacio(id){
+  const t = ($("#ind_t").value||"").trim();
+  if(!t) return alert("Escriu la indicació.");
+  if(id){
+    const esBase = INDICACIONS_BASE.some(x=>x.id===id);
+    if(esBase){ S.indicacions = S.indicacions||{}; S.indicacions[id] = {t}; }
+    else { S.indicacionsNoves = (S.indicacionsNoves||[]).map(x=>x.id===id?Object.assign({},x,{t}):x); }
+    apuntarCanvi("Ha canviat una indicació de la guia");
+  } else {
+    S.indicacionsNoves = S.indicacionsNoves || [];
+    S.indicacionsNoves.push({id:"i"+Date.now().toString(36), t});
+    apuntarCanvi("Ha afegit una indicació a la guia");
+  }
+  tocarConfig(); closeModal(); render();
+}
+function retirarIndicacio(id){
+  if(!confirm("Treure aquesta indicació de la guia?")) return;
+  if(INDICACIONS_BASE.some(x=>x.id===id)){
+    S.indicacions = S.indicacions||{}; S.indicacions[id] = Object.assign({}, S.indicacions[id], {retirat:true});
+  } else {
+    S.indicacionsNoves = (S.indicacionsNoves||[]).filter(x=>x.id!==id);
+  }
+  apuntarCanvi("Ha retirat una indicació de la guia");
+  tocarConfig(); render();
+}
+
+/* Hàbits */
+function blocHabits(){
+  const l = habits();
+  return `<div class="sec-title"><h2>Indicacions d'hàbits</h2>
+    <span class="muted small">Surten com a caselles a l'ordinador i al mòbil</span>
+    <span style="margin-left:auto" class="no-print">
+      <button class="btn ghost sm" onclick="editarHabit()">+ Afegir-ne un</button></span></div>
+    <div class="card pad small">`+
+    (l.length ? l.map(x=>`<div class="spread" style="padding:6px 0;gap:10px">
+        <span>· ${esc(x.n)}</span>
+        <span class="row no-print" style="gap:5px;flex:none">
+          <button class="btn ghost sm" onclick="editarHabit('${esc(x.id)}')">editar</button>
+          <button class="btn ghost sm" onclick="retirarHabit('${esc(x.id)}')">×</button></span>
+      </div>`).join("") : `<div class="muted">Cap hàbit.</div>`)+`</div>`;
+}
+function editarHabit(id){
+  const x = id ? totsElsHabits().find(y=>y.id===id) : null;
+  openModal(`<div class="mhead"><h3>${id?"Editar":"Nou"} hàbit</h3>
+    <button class="close" onclick="closeModal()">×</button></div>
+    <div class="mbody">
+      <input class="search" id="hab_n" value="${esc(x?x.n:"")}" placeholder="Per exemple: Passeig de 30 min al matí">
+      <button class="btn" style="margin-top:10px" onclick="desarHabit('${id?esc(id):""}')">Desar</button>
+      <button class="btn ghost" style="margin-top:9px" onclick="closeModal()">Cancel·lar</button></div>`, true);
+}
+function desarHabit(id){
+  const n = ($("#hab_n").value||"").trim();
+  if(!n) return alert("Posa-li un nom.");
+  if(id){
+    S.habitsEdit = S.habitsEdit || {};
+    S.habitsEdit[id] = Object.assign({}, S.habitsEdit[id], {n});
+    apuntarCanvi("Ha reanomenat l'hàbit «"+n+"»");
+  } else {
+    S.habitsNous = S.habitsNous || [];
+    S.habitsNous.push({id:"h"+Date.now().toString(36), n});
+    apuntarCanvi("Ha afegit l'hàbit «"+n+"»");
+  }
+  tocarConfig(); closeModal(); render();
+}
+function retirarHabit(id){
+  const nom = nomHabit(id);
+  if(!confirm("Retirar l'hàbit «"+nom+"»?\n\n"+
+    "No s'esborra: els dies antics que el tenien marcat el continuaran mostrant. "+
+    "Simplement deixa de sortir com a casella.")) return;
+  S.habitsEdit = S.habitsEdit || {};
+  S.habitsEdit[id] = Object.assign({}, S.habitsEdit[id], {retirat:true});
+  apuntarCanvi("Ha retirat l'hàbit «"+nom+"»");
+  tocarConfig(); render();
+}
+
+/* =====================================================================
    GUIA I DADES
    ===================================================================== */
 function viewGuia(){
   const e = Sync.est;
-  let h = `<div class="sec-title"><h2>Indicacions de la nutricionista</h2></div>
+  let h = `<div class="sec-title"><h2>Indicacions de la nutricionista</h2>
+    <span class="muted small">Aquesta és l'única pantalla on es canvien els criteris</span></div>
   <div class="card pad">
+    <div class="small muted" style="margin-bottom:10px">
+      Tot el que hi ha en aquesta pàgina mana sobre la resta de l'aplicatiu: els plats,
+      els suggeriments i el que veu ella. <b>Editar un plat no canvia mai res d'aquí.</b>
+      Cada canvi queda al registre, i les quantitats s'apliquen a partir de l'endemà
+      sense tocar els dies que ja estan validats.</div>
     <h3 style="font-size:15px;color:var(--verd-fosc)">Estructura del dia</h3>
-    <table style="margin-top:8px">
-      <tr><td class="qty" style="width:70px">7.30h</td><td><b>Esmorzar</b></td></tr>
-      <tr><td class="qty">11h</td><td><b>Mig matí — batut.</b> Base sempre: 250 ml de beguda d'ametlla ·
-        1 iogurt de soja (120 g) · 25 g de crema d'ametlles · 40 g de flocs de civada.
-        S'hi afegeix 1-2 racions de fruita i 1 cullerada de mel.
-        <div class="xs" style="color:var(--verd-fosc);font-weight:600">Nova indicació: deixar-lo preparat la nit anterior.</div></td></tr>
-      <tr><td class="qty">13.30h</td><td><b>Dinar</b></td></tr>
-      <tr><td class="qty">17h</td><td><b>Berenar</b> — peça de fruita i 2 boletes energètiques.
-        <div class="xs" style="color:var(--verd-fosc);font-weight:600">Nova indicació: incorporar-hi un entrepà.</div></td></tr>
-      <tr><td class="qty">21h</td><td><b>Sopar</b></td></tr>
+    <table style="margin-top:8px">` +
+    MEALS.map(m=>{
+      const F = apatsFixos()[m.id];
+      return `<tr><td class="qty" style="width:70px">${esc(m.h)}</td><td><b>${esc(m.n)}</b>
+        ${F?`<div class="xs muted">${esc(F.ajuda||"")}</div>
+          ${Object.keys(F.cal||{}).length?`<div class="xs">Sempre: ${
+            Object.entries(F.cal).map(([k,q])=>esc((ing(k)?ing(k).n:k)+" "+q+(ing(k)&&ing(k).ml?" ml":" g"))).join(" · ")}</div>`:""}
+          <button class="btn ghost sm no-print" style="margin-top:5px"
+            onclick="editarApatFix('${m.id}')">Canviar les quantitats</button>`
+        :`<div class="xs muted">Es mesura per racions (a sota)</div>`}</td></tr>`;
+    }).join("") + `
     </table>
   </div>
-  <div class="sec-title"><h2>Quantitats per plat únic</h2>
-    <span class="muted small">Un aliment de cada punt a cada plat o tàper</span></div>
-  <div class="card pad">
-    <h4 style="color:var(--verd-fosc)">1 · Proteïnes (tria'n una)</h4>
-    <table><tr><td>Tofu ferm</td><td class="qty">150 g</td></tr>
-      <tr><td>Soja texturitzada (en sec)</td><td class="qty">50 g</td></tr>
-      <tr><td>Llegums cuits: cigrons, llenties, mongetes</td><td class="qty">160 g</td></tr>
-      <tr><td>Edamame</td><td class="qty">90 g</td></tr>
-      <tr><td>Hummus de cigrons, tahini i oli d'oliva</td><td class="qty">3 cullerades soperes (≈90 g)</td></tr></table>
-    <h4 style="color:var(--verd-fosc);margin-top:14px">2 · Hidrats de carboni</h4>
-    <table><tr><td>Patata (en cru)</td><td class="qty">200 g</td></tr>
-      <tr><td>Moniato (en cru)</td><td class="qty">350 g</td></tr>
-      <tr><td>Quinoa o arròs (en sec)</td><td class="qty">60 g</td></tr>
-      <tr><td>Pa</td><td class="qty">90-100 g</td></tr>
-      <tr><td>Flocs de civada</td><td class="qty">80 g</td></tr></table>
-    <h4 style="color:var(--verd-fosc);margin-top:14px">3 · Verdures</h4>
-    <table><tr><td>Per plat, com a mínim dues, combinant colors</td><td class="qty">200 g</td></tr></table>
-    <div class="small muted" style="margin-top:5px">En un àpat verdura crua i a l'altre cuita, o a l'inrevés.
-      Crues: tomàquet, canonges, cogombre, pastanaga ratllada.
-      Cuinades: carbassó, pebrots, bròquil, albergínia, xampinyons.</div>
-    <h4 style="color:var(--verd-fosc);margin-top:14px">4 · Greixos saludables — dos DIFERENTS a cada àpat</h4>
-    <table><tr><td>Oli d'oliva verge extra</td><td class="qty">2 cullerades (20 ml)</td></tr>
-      <tr><td>Llavors de sèsam i lli triturades</td><td class="qty">2 cullerades</td></tr>
-      <tr><td>Fruits secs: cacauets o ametlles</td><td class="qty">1 grapat (40 g) al berenar</td></tr></table>
-  </div>
-  <div class="sec-title"><h2>Noves indicacions</h2></div>
-  <div class="card pad small">
-    <div style="padding:6px 0">· Alternar les postres: <b>iogurt al dinar i fruita al sopar</b>, o a l'inrevés.</div>
-    <div style="padding:6px 0">· <b>Deixar el batut preparat la nit anterior</b> per prendre'l a mig matí.</div>
-    <div style="padding:6px 0">· <b>Incorporar un entrepà al berenar</b> per assegurar un bon aport d'energia.</div>
-    <div style="padding:6px 0">· <b>Descansar entre 30 i 40 minuts després dels àpats principals</b>,
-      especialment si hi ha molèsties digestives. El passeig diari es pot repartir en
-      <b>30 minuts al matí i 30 minuts al vespre</b>.</div>
-  </div>
+  <div class="sec-title"><h2>Quantitats per ració</h2>
+    <span class="muted small">Un aliment de cada grup a cada plat o tàper</span></div>`;
+
+  /* Les quantitats surten de racions(). Abans eren text escrit a ma dins
+     d'aquest fitxer i podien contradir el que feia servir l'aplicatiu:
+     la guia deia "patata 200 g" mentre el calcul ja en feia servir 300. */
+  h += blocRacions();
+  h += `
+  ${blocIndicacions()}
+  ${blocHabits()}
 
   <div class="sec-title"><h2>Sincronització</h2></div>
   <div class="card pad small">`;

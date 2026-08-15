@@ -246,6 +246,11 @@ function loadState(){
   s.editsIng    = s.editsIng    || {};  // modificacions sobre aliments i receptes de base
   s.racions     = s.racions     || {};  // modificacions sobre les racions (les vigents ara)
   s.racionsHist = s.racionsHist || [];  // històric datat: com quedaven després de cada canvi
+  s.apatsFixos  = s.apatsFixos  || {};  // receptes fixes dels àpats petits (Guia)
+  s.indicacions = s.indicacions || {};  // canvis sobre les indicacions en text
+  s.indicacionsNoves = s.indicacionsNoves || [];
+  s.habitsEdit  = s.habitsEdit  || {};  // canvis i retirades d'hàbits
+  s.habitsNous  = s.habitsNous  || [];
   /* Si ja hi havia racions canviades abans que existís l'històric, les
      donem per vigents des de sempre. Si no, un dia validat d'abans es
      valoraria amb les de base i canviaria de resultat. */
@@ -526,20 +531,26 @@ function checkItems(items, mealId, quan){
   const s = structure(items);
   const f = [];
   const d = {i:items};
-  if(mealId==="migmati"){
-    if((d.i.llet_ame||0)   < 250) f.push("els 250 ml de beguda d'ametlla");
-    if((d.i.iogurt_soja||0)< 120) f.push("el iogurt de soja");
-    if((d.i.crema_ame||0)  < 25)  f.push("els 25 g de crema d'ametlles");
-    if((d.i.avena||0)      < 40)  f.push("els 40 g de flocs de civada");
-    if(s.g.fruita < 100)          f.push("la fruita");
-  } else if(mealId==="berenar"){
-    if(s.g.fruita < 90) f.push("la peça de fruita");
-    if((d.i.boleta||0) < 90 && s.g.greix < 30 && (d.i.pa||0) < 50)
-      f.push("les boletes, l'entrepà o el grapat de fruits secs");
-  } else { /* esmorzar */
-    if(s.g.hc < 60)          f.push("el pa o els flocs de civada");
-    if(!s.g.prot)            f.push("un aliment amb proteïna");
-    if(!s.greixos.length)    f.push("un greix saludable");
+  {
+    /* Els números surten d'apatsFixos(), o sigui de la Guia. Abans eren
+       aquí dins i no hi havia manera de canviar-los. */
+    const F = apatsFixos()[mealId] || {min:{}, cal:{}};
+    for(const [k,q] of Object.entries(F.cal||{}))
+      if((d.i[k]||0) < q)
+        f.push((ing(k)?ing(k).n.toLowerCase():k)+" ("+q+(ing(k)&&ing(k).ml?" ml":" g")+")");
+    for(const [cat,q] of Object.entries(F.min||{}))
+      if((s.g[cat]||0) < q)
+        f.push(cat==="fruita" ? "la fruita"
+             : cat==="hc"     ? "el pa o els flocs de civada" : "més "+cat);
+    if(F.alguna && Object.keys(F.alguna).length){
+      const teCap = Object.entries(F.alguna).some(([k,q]) =>
+        (k==="greix" ? (s.g.greix||0) : (d.i[k]||0)) >= q);
+      if(!teCap) f.push("les boletes, l'entrepà o el grapat de fruits secs");
+    }
+    if(mealId==="esmorzar"){
+      if(!s.g.prot)         f.push("un aliment amb proteïna");
+      if(!s.greixos.length) f.push("un greix saludable");
+    }
   }
   return {complet:f.length===0, falten:f, buit:false};
 }
@@ -1106,11 +1117,86 @@ function racions(quan){
   for(const [grup, canvis] of Object.entries(racionsVigents(quan))){
     if(!r[grup]) r[grup] = {n:grup, perApat:1, aliments:{}};
     if(canvis.perApat!=null) r[grup].perApat = canvis.perApat;
-    for(const [k,v] of Object.entries(canvis.aliments||{}))
-      r[grup].aliments[k] = Object.assign({}, r[grup].aliments[k], v, {font:"editat"});
+    for(const [k,v] of Object.entries(canvis.aliments||{})){
+      /* Retirat: surt del grup, però l'aliment segueix existint. Els plats
+         antics que el porten han de poder-ne llegir el nom; el que passa
+         és que deixa de comptar com a ració, i per tant el plat deixa de
+         complir i el botó d'actualitzar ho reporta. */
+      if(v && v.retirat){ delete r[grup].aliments[k]; continue; }
+      r[grup].aliments[k] = Object.assign({}, r[grup].aliments[k], v,
+        {font: (r[grup].aliments[k] ? "editat" : "afegida")});
+    }
   }
   return r;
 }
+
+/* =====================================================================
+   11ter. LA GUIA DE LA NUTRICIONISTA
+   ---------------------------------------------------------------------
+   Tot el que decideix ella viu aquí i només es toca des de la pestanya
+   Guia. Editar un plat no canvia mai cap d'aquests números.
+
+   Tres coses: les racions (secció 11), les receptes fixes dels àpats
+   petits, i els hàbits. Abans les dues últimes eren text i números dins
+   del codi, i podien contradir el que feia servir l'aplicatiu.
+   --------------------------------------------------------------------- */
+
+/* Els àpats petits no es mesuren en racions sinó per una recepta fixa. */
+const APATS_FIXOS_BASE = {
+  esmorzar:{n:"Esmorzar", ajuda:"Pa o flocs de civada, proteïna i un greix",
+            min:{hc:60}, cal:{}},
+  migmati: {n:"Mig matí — batut",
+            ajuda:"Base sempre igual; s'hi afegeix fruita i una cullerada de mel",
+            min:{fruita:100}, cal:{llet_ame:250, iogurt_soja:120, crema_ame:25, avena:40}},
+  berenar: {n:"Berenar", ajuda:"Peça de fruita, i boletes, entrepà o fruits secs",
+            min:{fruita:90}, cal:{}, alguna:{boleta:90, greix:30, pa:50}},
+};
+function apatsFixos(quan){
+  const r = JSON.parse(JSON.stringify(APATS_FIXOS_BASE));
+  for(const [apat, c] of Object.entries(S.apatsFixos||{})){
+    if(!r[apat]) continue;
+    for(const camp of ["min","cal","alguna"])
+      if(c[camp]) r[apat][camp] = Object.assign({}, r[apat][camp], c[camp]);
+    if(c.ajuda!=null) r[apat].ajuda = c.ajuda;
+  }
+  return r;
+}
+
+/* Indicacions en text. Les que porta el programa es poden editar i
+   retirar, i se'n poden afegir de noves. */
+const INDICACIONS_BASE = [
+  {id:"i_postres", t:"Alternar les postres: iogurt al dinar i fruita al sopar, o a l'inrevés."},
+  {id:"i_batut",   t:"Deixar el batut preparat la nit anterior."},
+  {id:"i_entrepa", t:"Incorporar un entrepà al berenar per assegurar un bon aport d'energia."},
+  {id:"i_descans", t:"Descansar entre 30 i 40 minuts després dels àpats principals."},
+];
+function indicacions(){
+  const ed = S.indicacions || {};
+  const out = INDICACIONS_BASE
+    .map(x => Object.assign({base:true}, x, ed[x.id]))
+    .filter(x => !x.retirat);
+  for(const x of (S.indicacionsNoves||[])) if(!x.retirat) out.push(Object.assign({base:false}, x));
+  return out;
+}
+
+/* Hàbits. Es poden canviar, retirar i afegir. Els retirats no s'esborren:
+   un dia antic que en va marcar un ha de poder-ne llegir el nom. */
+const HABITS_BASE = [
+ {id:"batut_nit", n:"Batut preparat la nit anterior"},
+ {id:"descans_d", n:"Descans de 30-40 min després del dinar"},
+ {id:"descans_s", n:"Descans de 30-40 min després del sopar"},
+ {id:"passeig_m", n:"Passeig de 30 min al matí"},
+ {id:"passeig_v", n:"Passeig de 30 min al vespre"},
+];
+function totsElsHabits(){
+  const ed = S.habitsEdit || {};
+  const out = HABITS_BASE.map(h => Object.assign({base:true}, h, ed[h.id]));
+  for(const h of (S.habitsNous||[])) out.push(Object.assign({base:false}, h, ed[h.id]));
+  return out;
+}
+function habits(){ return totsElsHabits().filter(h => !h.retirat); }
+/* El nom d'un hàbit, encara que s'hagi retirat. */
+const nomHabit = id => (totsElsHabits().find(h=>h.id===id)||{n:id}).n;
 
 /* Grup d'equivalència d'un aliment (verd_c i verd_k compten com "verd") */
 function grupRacio(k, quan){
@@ -1275,7 +1361,10 @@ function recalcularPlat(dish, mealId, quan){
    abans d'aplicar. */
 function previsioActualitzacio(quan){
   const out = [];
-  for(const d of DISHES()){
+  /* També els plats retirats. Estan fora de la tria, però se'ls apliquen
+     les mateixes regles: quan es tornin a activar han d'estar al dia i no
+     arrossegar quantitats velles. */
+  for(const d of totsElsPlats()){
     const mealId = d.m.includes("dinar") ? "dinar"
                  : d.m.includes("sopar") ? "sopar" : null;
     if(!mealId) continue;                    // els àpats petits, a la part b
@@ -1284,7 +1373,7 @@ function previsioActualitzacio(quan){
     if(!r.canvis.length && !r.avisos.length) continue;
     const despres = checkItems(r.i, mealId, quan).complet;
     out.push({id:d.id, n:d.n, mealId, canvis:r.canvis, avisos:r.avisos,
-              i:r.i, abans, despres});
+              i:r.i, abans, despres, retirat:!!d.amagat});
   }
   return out;
 }
@@ -1414,7 +1503,9 @@ const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 
 if (typeof module !== "undefined") module.exports = {
-  ING, MEALS, DIES, BASE_DISHES, POSTRES, HABITS, CATS, QTY_REF,
+  ING, MEALS, DIES, BASE_DISHES, POSTRES, CATS, QTY_REF,
+  HABITS_BASE, habits, totsElsHabits, nomHabit,
+  APATS_FIXOS_BASE, apatsFixos, INDICACIONS_BASE, indicacions,
   loadState, saveState, allIng, ing, DISHES, dishById, iso, monday, addDays,
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,
