@@ -244,6 +244,40 @@ const Sync = (() => {
 
   function aturarEscolta(){ unsub.forEach(f=>{try{f()}catch(e){}}); unsub=[]; }
 
+  /* --- separacio guia / seguiment ---
+     A "config/general" nomes hi ha d'haver la guia: els plats, els
+     aliments, les racions, els criteris, les indicacions i els habits.
+     Es el que el mobil necessita per dir-li que li toca menjar ara.
+     El seguiment -pes, diari, missatges, documents i objectius- viu a
+     "privat/seguiment", on el mobil no mira mai. */
+  const CAMPS_SEGUIMENT = ["pesos","diari","missatges","documents","canvis","target","targetHist"];
+  const teSeguiment = r => CAMPS_SEGUIMENT.some(k => r[k] !== undefined);
+
+  /* Ho passem d'un document a l'altre i ho esborrem del vell. Es fa amb
+     el que el client ja te fusionat, o sigui despres de llegir-ho, i
+     nomes des d'un aparell d'adult. Si es corre dues vegades no passa
+     res: la segona ja no hi troba res a moure. */
+  let migrant = false;
+  async function migrarSeguiment(){
+    if(migrant || NOMES_GUIA || est.estat!=="connectat") return;
+    migrant = true;
+    try{
+      await enviarPrivat();
+      const treure = {};
+      for(const k of CAMPS_SEGUIMENT) treure[k] = firebase.firestore.FieldValue.delete();
+      await dbf.doc("plans/"+PLA_ID+"/config/general").update(treure);
+      console.info("Seguiment separat de la guia.");
+    }catch(e){ console.warn("migrarSeguiment:", e); }
+    finally{ migrant = false; }
+  }
+
+  function fusionarDocuments(remots){
+    const ids = new Set((S.documents||[]).map(d=>d.id));
+    let canviat = false;
+    for(const d of remots) if(!ids.has(d.id)){ (S.documents=S.documents||[]).push(d); canviat = true; }
+    return canviat;
+  }
+
   /* Escoltem la configuració general i les setmanes des de 8 setmanes
      enrere: no cal descarregar tot l'històric a cada obertura. */
   function escoltar(){
@@ -272,23 +306,48 @@ const Sync = (() => {
         S.indicacionsNoves = r.indicacionsNoves || S.indicacionsNoves;
         S.habitsEdit       = r.habitsEdit       || S.habitsEdit;
         S.habitsNous       = r.habitsNous       || S.habitsNous;
-        S.canvis       = r.canvis       || S.canvis;
-        S.target     = r.target !== undefined ? r.target : S.target;
-        S.targetHist = r.targetHist || S.targetHist;
         S.metaRev   = r.rev;
         canviat = true;
       }
-      /* Missatges i pesos es fusionen per element, no es reemplacen:
-         dues persones poden escriure alhora sense trepitjar-se. */
-      if(r.missatges) canviat = fusionarMissatges(r.missatges) || canviat;
-      if(r.pesos)     canviat = fusionarPesos(r.pesos) || canviat;
-      if(r.diari)     canviat = fusionarDiari(r.diari) || canviat;
-      if(r.documents){
-        const ids = new Set((S.documents||[]).map(d=>d.id));
-        for(const d of r.documents) if(!ids.has(d.id)){ (S.documents=S.documents||[]).push(d); canviat = true; }
+      /* --- restes d'abans de la separacio ---
+         Fins ara el seguiment viatjava dins d'aquest mateix document.
+         Els adults se l'enduen cap al document privat i despres el treuen
+         d'aqui; el mobil no en fa res, i com que ja no ho desa, al telefon
+         hi deixa de ser encara que el document vell encara ho porti. */
+      if(!NOMES_GUIA && teSeguiment(r)){
+        if(r.missatges) canviat = fusionarMissatges(r.missatges) || canviat;
+        if(r.pesos)     canviat = fusionarPesos(r.pesos) || canviat;
+        if(r.diari)     canviat = fusionarDiari(r.diari) || canviat;
+        if(r.documents) canviat = fusionarDocuments(r.documents) || canviat;
+        if(r.canvis && !(S.canvis||[]).length){ S.canvis = r.canvis; canviat = true; }
+        if(r.target !== undefined && S.target == null){ S.target = r.target; canviat = true; }
+        if(r.targetHist && !(S.targetHist||[]).length){ S.targetHist = r.targetHist; canviat = true; }
+        migrarSeguiment();
       }
       if(canviat){ desarLocal(); onCanvi(est, true); }
     }, e=>console.warn("config:",e)));
+
+    /* El seguiment va en un document a part, i el mobil no s'hi
+       subscriu. Pes, diari, missatges, documents i objectius no li han
+       d'arribar mai: no n'hi ha prou de no ensenyar-los-hi. */
+    if(!NOMES_GUIA)
+      unsub.push(dbf.doc("plans/"+PLA_ID+"/privat/seguiment").onSnapshot(d=>{
+        if(!d.exists) return;
+        const r = d.data();
+        let canviat = false;
+        if(r.rev!=null && r.rev > (S.privatRev||0)){
+          S.canvis     = r.canvis     || S.canvis;
+          S.target     = r.target !== undefined ? r.target : S.target;
+          S.targetHist = r.targetHist || S.targetHist;
+          S.privatRev  = r.rev;
+          canviat = true;
+        }
+        if(r.missatges) canviat = fusionarMissatges(r.missatges) || canviat;
+        if(r.pesos)     canviat = fusionarPesos(r.pesos) || canviat;
+        if(r.diari)     canviat = fusionarDiari(r.diari) || canviat;
+        if(r.documents) canviat = fusionarDocuments(r.documents) || canviat;
+        if(canviat){ desarLocal(); onCanvi(est, true); }
+      }, e=>console.warn("privat:",e)));
 
     unsub.push(dbf.collection("plans/"+PLA_ID+"/setmanes")
       .where(firebase.firestore.FieldPath.documentId(), ">=", desde)
@@ -356,6 +415,10 @@ const Sync = (() => {
   }
 
   function desarLocal(){
+    /* Al telefon, res que no sigui la guia no arriba al disc. Aquesta
+       passada va abans d'escriure, no despres: la copia local es feia
+       ABANS d'avisar l'aplicatiu, i per aixo fins ara hi quedava tot. */
+    if(NOMES_GUIA) nomesGuia(S);
     try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
   }
 
@@ -368,6 +431,20 @@ const Sync = (() => {
   }
   function pushSetmana(k){ pendents.add(k); programar(); }
   function pushConfig(){ pendents.add("__config__"); programar(); }
+
+  async function enviarPrivat(){
+    if(NOMES_GUIA) return;
+    S.privatRev = (S.privatRev||0)+1;
+    await dbf.doc("plans/"+PLA_ID+"/privat/seguiment").set({
+      canvis:(S.canvis||[]).slice(0,300),
+      missatges:(S.missatges||[]).slice(0,300),
+      pesos:S.pesos||{}, diari:S.diari||{},
+      documents:(S.documents||[]).slice(0,200),
+      target:S.target||null, targetHist:S.targetHist||[],
+      rev:S.privatRev,
+      actualitzat: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+  }
 
   function programar(){
     if(est.estat!=="connectat") return;
@@ -393,12 +470,12 @@ const Sync = (() => {
             apatsFixos:S.apatsFixos||{}, indicacions:S.indicacions||{},
             indicacionsNoves:S.indicacionsNoves||[],
             habitsEdit:S.habitsEdit||{}, habitsNous:S.habitsNous||[],
-            canvis:(S.canvis||[]).slice(0,300),
-            missatges:(S.missatges||[]).slice(0,300),
-            pesos:S.pesos||{}, diari:S.diari||{}, documents:(S.documents||[]).slice(0,200),
-            target:S.target||null, targetHist:S.targetHist||[], rev:S.metaRev,
+            rev:S.metaRev,
             actualitzat: firebase.firestore.FieldValue.serverTimestamp()
           }, {merge:true});
+          /* El seguiment va al seu document, i nomes des d'un aparell
+             d'adult. El mobil no arriba mai aqui: no crida pushConfig. */
+          if(!NOMES_GUIA) await enviarPrivat();
         } else {
           const dies = S.weeks[k]; if(!dies) continue;
           await dbf.doc("plans/"+PLA_ID+"/setmanes/"+k).set({

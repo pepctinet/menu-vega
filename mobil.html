@@ -232,9 +232,18 @@ textarea.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-
 
 <input type="file" accept="image/*" capture="environment" id="camera" style="display:none">
 
-<script src="firebase-config.js?v=2026-08-15b"></script>
-<script src="core.js?v=2026-08-15b"></script>
-<script src="sync.js?v=2026-08-15b"></script>
+<script>
+/* Ha d'anar ABANS de core.js i de sync.js: tots dos el llegeixen en
+   carregar-se. Vol dir dues coses alhora:
+     · no baixis del servidor res que no sigui la guia i les setmanes;
+     · desa-ho a la clau d'aquest aplicatiu, no a la compartida.
+   Sense això, el telèfon es desava a dins el pes, el diari, els
+   missatges i els documents encara que no els ensenyés enlloc. */
+window.MENU_VEGA_NOMES_GUIA = true;
+</script>
+<script src="firebase-config.js?v=2026-08-15c"></script>
+<script src="core.js?v=2026-08-15c"></script>
+<script src="sync.js?v=2026-08-15c"></script>
 <script>
 /* =====================================================================
    APLICATIU DE MÒBIL · només el dia en curs
@@ -249,11 +258,11 @@ let araAnterior = null;
 
 /* Si arriben del servidor valors nutricionals en aliments personalitzats
    o objectius numèrics, els descartem: aquí no hi pinten res. */
-function netejarNutri(){
-  for(const k of Object.keys(S.customIng||{}))
-    if(S.customIng[k] && S.customIng[k].nutri) delete S.customIng[k].nutri;
-  if(S.target) S.target = null;
-}
+/* Ara ho fa nomesGuia() de core.js, que treu tot el que no és la guia i
+   no només els nutrients: pes, diari, missatges, documents i objectius.
+   Es crida en carregar, en desar i cada vegada que arriben canvis. Això
+   es queda com a nom curt per no haver de tocar les crides. */
+function netejarNutri(){ nomesGuia(S); }
 netejarNutri();
 
 const IC = {

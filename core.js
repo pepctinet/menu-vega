@@ -287,12 +287,60 @@ const CATS = [
 /* ---------------------------------------------------------------------
    4. ESTAT I PERSISTÈNCIA LOCAL
    --------------------------------------------------------------------- */
-const KEY = "menuvega_v2";
+/* =====================================================================
+   QUINA APLICACIÓ SOM
+   ---------------------------------------------------------------------
+   mobil.html posa MENU_VEGA_NOMES_GUIA = true abans de carregar això.
+   D'aquest senyal en pengen dues coses:
+
+     · sync.js no li baixa res que no sigui la guia i les setmanes;
+     · les dades del telèfon van a la seva pròpia clau.
+
+   El motiu de la clau separada: fins ara els tres aplicatius compartien
+   "menuvega_v2", i per tant el telèfon es desava a dins el pes, el diari,
+   els missatges i els documents encara que no els ensenyés enlloc. "No
+   mostrar" no és "no tenir". Amb la clau pròpia, al telèfon no hi ha res
+   d'això per trobar.
+   --------------------------------------------------------------------- */
+const NOMES_GUIA = (typeof window !== "undefined") && !!window.MENU_VEGA_NOMES_GUIA;
+const KEY = NOMES_GUIA ? "menuvega_mobil_v1" : "menuvega_v2";
+
+/* El que el mòbil pot tenir. Tota la resta, encara que arribi, no es desa. */
+const CAMPS_GUIA = ["weeks","custom","customIng","editsPlats","platsAmagats","editsIng",
+  "racions","racionsHist","apatsFixos","apatsFixosHist","indicacions","indicacionsNoves",
+  "habitsEdit","habitsNous","metaRev","rev","savedAt"];
+
+/* Passada de neteja: del telèfon en surt tot el que no sigui la guia.
+   Es fa servir en carregar i cada vegada que arriben canvis del servidor. */
+function nomesGuia(s){
+  if(!s) return s;
+  for(const k of Object.keys(s)) if(!CAMPS_GUIA.includes(k)) delete s[k];
+  /* Els valors nutricionals viuen dins dels aliments personalitzats:
+     no n'hi ha prou de mirar les claus de primer nivell. */
+  for(const v of Object.values(s.customIng||{})) if(v && v.nutri) delete v.nutri;
+  return s;
+}
 
 function loadState(){
   let s = null;
   try{ s = JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
+  /* Primera obertura del mòbil amb la clau nova: ens enduem el que sigui
+     de la guia i les setmanes de la clau vella (les seves adaptacions
+     encara no enviades hi poden ser) i tot seguit ESBORREM la clau vella
+     del telèfon. És el que treu d'allà el pes, el diari, els missatges i
+     els documents que s'hi havien anat desant fins ara. */
+  if(!s && NOMES_GUIA){
+    try{
+      const vell = JSON.parse(localStorage.getItem("menuvega_v2")||"null");
+      if(vell){
+        s = nomesGuia(vell);
+        localStorage.setItem(KEY, JSON.stringify(s));
+      }
+      localStorage.removeItem("menuvega_v2");
+    }catch(e){}
+  }
   if(!s) s = {};
+  if(NOMES_GUIA) nomesGuia(s);
   s.weeks    = s.weeks    || {};   // {setmana: {data: {meals,postres,habits,validat,fotos}}}
   s.custom   = s.custom   || [];   // plats creats de nou
   s.customIng= s.customIng|| {};   // aliments creats de nou
@@ -336,6 +384,8 @@ let S = (typeof localStorage!=="undefined") ? loadState() : {weeks:{},custom:[],
 function saveState(silent){
   S.rev = (S.rev||0) + 1;
   S.savedAt = new Date().toISOString();
+  /* Al telèfon, l'última reixa abans de deixar res escrit al disc. */
+  if(NOMES_GUIA) nomesGuia(S);
   try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){
     console.warn("No s'ha pogut desar en local:", e);
   }
@@ -1686,7 +1736,8 @@ if (typeof module !== "undefined") module.exports = {
   ING, MEALS, DIES, BASE_DISHES, POSTRES, CATS, QTY_REF,
   HABITS_BASE, habits, totsElsHabits, nomHabit,
   APATS_FIXOS_BASE, apatsFixos, INDICACIONS_BASE, indicacions,
-  loadState, saveState, allIng, ing, DISHES, dishById, iso, monday, addDays,
+  loadState, saveState, nomesGuia, CAMPS_GUIA, KEY,
+  allIng, ing, DISHES, dishById, iso, monday, addDays,
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,
   unitatTxt, nomUnitat, MIDES, plural, esc, escJs,
