@@ -293,7 +293,7 @@ const Sync = (() => {
   /* Escoltem la configuració general i les setmanes des de 8 setmanes
      enrere: no cal descarregar tot l'històric a cada obertura. */
   function escoltar(){
-    const desde = weekKey(addDays(TODAY,-56));
+    const desde = weekKey(addDays(avui(),-56));
     unsub.push(dbf.doc("plans/"+PLA_ID+"/config/general").onSnapshot(d=>{
       if(!d.exists) return;
       const r = d.data();

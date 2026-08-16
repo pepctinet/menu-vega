@@ -445,7 +445,88 @@ function weekKey(d){
 const fmtDay  = d => d.getDate()+" "+MESOS3[d.getMonth()];
 const fmtLong = d => DIES[(d.getDay()+6)%7]+", "+d.getDate()+" de "+MESOS[d.getMonth()];
 const parseDay = ds => new Date(ds+"T00:00:00");
-const TODAY = (()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; })();
+
+/* El dia d'avui, calculat CADA VEGADA que es demana.
+   Abans era un const calculat una sola vegada en carregar. Amb un
+   aplicatiu que es queda obert —el telèfon d'ella ho està sempre— passada
+   la mitjanit continuava valent el dia d'ahir: una pesada de les 00:30 o
+   una nota es desaven sota la data equivocada, i un dia ja passat encara
+   es deixava tocar. */
+function avui(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+
+/* Quan comença el dia següent. Es calcula amb el calendari local, o sigui
+   que els dies de canvi d'hora (Europe/Madrid, març i octubre) surten de
+   23 o de 25 hores i el compte continua sent correcte. */
+function propersMitjanit(ara){
+  const d = new Date(ara || new Date());
+  d.setHours(0,0,0,0); d.setDate(d.getDate()+1);
+  return d;
+}
+
+/* TODAY es queda com a nom, però ja no és un valor congelat: és una
+   propietat que torna a preguntar l'hora cada vegada que es llegeix.
+   Així cap crida antiga no es queda amb el dia d'ahir sense avisar. */
+if(typeof globalThis !== "undefined" && !Object.getOwnPropertyDescriptor(globalThis,"TODAY"))
+  Object.defineProperty(globalThis, "TODAY", { get: avui, configurable: true });
+
+/* ---------------------------------------------------------------------
+   El canvi de dia amb l'aplicatiu obert.
+
+   El telèfon d'ella es queda obert; l'ordinador, també. Cal que el dia
+   canviï, però NO en sec a les 00:00: si ho fes, un text a mig escriure
+   —un àpat fet fora, una observació— desapareixeria de cop davant seu.
+
+   La regla és: el dia canvia quan es torna a mirar l'aplicatiu.
+     · Si estava amagat, en tornar a primer pla.
+     · Si estava a la vista sense tocar-lo, al primer toc o tecla, i
+       ABANS que el toc arribi enlloc (per això l'escolta és de captura).
+       El toc que fa el canvi es perd; val més perdre'l que no pas que
+       vagi a parar al dia d'ahir.
+
+   El temporitzador es torna a armar sol i sempre es compara amb el
+   rellotge de debò, mai comptant temps transcorregut: un aparell que
+   s'ha adormit es desperta amb el comptador endarrerit.
+   --------------------------------------------------------------------- */
+function vigilarCanviDeDia(onCanvi){
+  if(typeof document === "undefined") return null;   // a les proves no hi ha document
+  let diaVist = iso(avui());
+  let rellotge = null;
+
+  function aplicar(){
+    const d = iso(avui());
+    if(d === diaVist) return false;
+    diaVist = d;
+    try{ onCanvi(d); }catch(e){ console.error("canvi de dia:", e); }
+    return true;
+  }
+  function alPrimerToc(){
+    document.addEventListener("pointerdown", aplicar, {capture:true, once:true});
+    document.addEventListener("keydown",     aplicar, {capture:true, once:true});
+  }
+  function tic(){
+    armar();
+    if(iso(avui()) === diaVist) return;
+    if(document.hidden) return;      // ja ho agafarà el visibilitychange
+    alPrimerToc();
+  }
+  function armar(){
+    if(rellotge) clearTimeout(rellotge);
+    /* Com a molt sis hores de son: setTimeout llargs no són fiables. */
+    const espera = Math.min(Math.max(1000, propersMitjanit() - Date.now() + 2000),
+                            6*3600*1000);
+    rellotge = setTimeout(tic, espera);
+  }
+
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.visibilityState === "visible") aplicar();
+  });
+  if(typeof window !== "undefined"){
+    window.addEventListener("focus",   aplicar);
+    window.addEventListener("pageshow", aplicar);
+  }
+  armar();
+  return { dia: ()=>diaVist, comprovar: aplicar };
+}
 
 function weekData(mon){
   const k = weekKey(mon);
@@ -786,7 +867,7 @@ function platsBons(mid){
 
 function proposarSetmana(mon, opcions){
   const o = opcions||{};
-  const desde = o.desde || TODAY;          // no toquem res anterior a aquesta data
+  const desde = o.desde || avui();         // no toquem res anterior a aquesta data
   const P = {}; for(const m of MEALS) P[m.id] = platsBons(m.id);
   const teCrua = d => structure(d.i).g.verd_c >= 100;
   const fruites = ["p_fruita_poma","p_fruita_taronja","p_fruita_pera",
@@ -953,7 +1034,7 @@ function reprogramarCadena(ds, mealId, opcions){
          només mira les dues últimes (i la validació pel seu compte);
          la del dia passat no la mira ningú i l'hem de fer aquí. */
       const dt = parseDay(t.ds);
-      if(dt < TODAY) continue;                        // dia passat
+      if(dt < avui()) continue;                       // dia passat
       /* Si el dia encara no existeix no hi ha res programat, o sigui que
          no hi ha res a canviar. Val més sortir aquí que no pas cridar
          dayData(), que el crearia buit i l'enviaria al servidor. */
@@ -1092,7 +1173,7 @@ function compraDe(mon, desDavui){
   const out = {}, preps = new Set();
   for(let i=0;i<7;i++){
     const dt = addDays(mon,i);
-    if(desDavui && dt < TODAY) continue;
+    if(desDavui && dt < avui()) continue;
     const day = dayData(iso(dt));
     for(const m of MEALS){
       const d = dishById(day.meals[m.id]); if(!d) continue;
@@ -1315,9 +1396,9 @@ function apatsFixosVigents(quan){
 /* El moment amb què s'ha de valorar un dia. L'inici d'avui és el que
    deixa fora els canvis fets avui mateix. */
 function momentDe(day){
-  return (day && day.validat) ? day.validat : TODAY.toISOString();
+  return (day && day.validat) ? day.validat : avui().toISOString();
 }
-const MOMENT_ARA = () => TODAY.toISOString();
+const MOMENT_ARA = () => avui().toISOString();
 /* Per defecte, tota valoració i tota equivalència es fan amb el moment
    d'ara. racions() sense argument segueix donant les vigents de debò,
    que és el que necessita la pantalla d'edicio. */
@@ -1788,7 +1869,8 @@ if (typeof module !== "undefined") module.exports = {
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,
   unitatTxt, nomUnitat, MIDES, plural, esc, escJs,
-  qtyRef, fruitPieces, postresAlternades, esValidat, TODAY, fmtDay, fmtLong,
+  qtyRef, fruitPieces, postresAlternades, esValidat, fmtDay, fmtLong,
+  avui, propersMitjanit, vigilarCanviDeDia, get TODAY(){ return avui(); },
   parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
   desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,

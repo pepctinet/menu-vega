@@ -145,18 +145,18 @@ textarea.camp{min-height:90px;resize:vertical}
 <div class="ov" id="ov"></div>
 <div class="sheet" id="sheet"><div class="sh" id="shHead"></div><div class="sb" id="shBody"></div></div>
 
-<script src="firebase-config.js?v=2026-08-15d"></script>
-<script src="core.js?v=2026-08-15d"></script>
-<script src="sync.js?v=2026-08-15d"></script>
+<script src="firebase-config.js?v=2026-08-16a"></script>
+<script src="core.js?v=2026-08-16a"></script>
+<script src="sync.js?v=2026-08-16a"></script>
 <script>
 /* =====================================================================
    REGISTRE DE PES
    ===================================================================== */
 const CONDICIONS = ["En dejú","Al matí","Abans d'esmorzar","Després del bany","Al vespre"];
 let cond = [];
-let DS = iso(TODAY);
+let DS = iso(avui());
 
-document.getElementById("data").textContent = fmtLong(TODAY);
+document.getElementById("data").textContent = fmtLong(avui());
 
 /* Es passa la POSICIÓ a la llista, no el text. Amb el text, l'apòstrof
    de "Abans d'esmorzar" tancava la cadena i el botó es quedava mut. */
@@ -341,6 +341,21 @@ async function entrar(){
 }
 
 Sync.init(pintarSinc);
+
+/* Canvi de dia. Aquí és on més mal feia: una pesada de les 00:30 es
+   desava sota la data d'ahir. Es buiden els camps perquè el que hi
+   hagués escrit era d'un altre dia. */
+vigilarCanviDeDia(dia => {
+  DS = dia;
+  document.getElementById("data").textContent = fmtLong(parseDay(dia));
+  document.getElementById("kg").value   = "";
+  document.getElementById("nota").value = "";
+  document.getElementById("hora").value = "";
+  document.getElementById("avisOk").innerHTML = "";
+  cond = []; pintarChips();
+  carregarAvui();
+  pintarValidacio();
+});
 </script>
 </body>
 </html>

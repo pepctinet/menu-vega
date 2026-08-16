@@ -241,15 +241,15 @@ textarea.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-
    missatges i els documents encara que no els ensenyés enlloc. */
 window.MENU_VEGA_NOMES_GUIA = true;
 </script>
-<script src="firebase-config.js?v=2026-08-15d"></script>
-<script src="core.js?v=2026-08-15d"></script>
-<script src="sync.js?v=2026-08-15d"></script>
+<script src="firebase-config.js?v=2026-08-16a"></script>
+<script src="core.js?v=2026-08-16a"></script>
+<script src="sync.js?v=2026-08-16a"></script>
 <script>
 /* =====================================================================
    APLICATIU DE MÒBIL · només el dia en curs
    ===================================================================== */
 
-let DS = iso(TODAY);        // sempre avui
+let DS = iso(avui());       // sempre avui; es refresca al canvi de dia
 let camCtx = null;
 /* Àpats que s'han desplegat a mà. Es buiden quan canvia l'àpat "Ara",
    de manera que la vista torna sola a ensenyar només el que toca. */
@@ -883,11 +883,22 @@ function pintarSinc(e, hiHaCanvis){
 pintar();
 Sync.init(pintarSinc);
 
-/* Si canvia el dia mentre l'aplicatiu està obert, es recarrega */
+/* El canvi de dia. No es recarrega la pàgina: recarregar-la buidaria la
+   cua de fotos pendents d'enviar. Només es canvia el dia i es repinta.
+   Es fa quan ella torna a mirar el telèfon, mai en sec a mitjanit. */
+vigilarCanviDeDia(dia => {
+  DS = dia;
+  desplegats.clear();
+  araAnterior = null;
+  pintar();
+  reintentarFotos();
+});
+
+/* En tornar a primer pla sense canvi de dia, repintem igualment: pot
+   haver canviat l'àpat "Ara" o haver entrat alguna cosa del servidor. */
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState!=="visible") return;
-  const avui = new Date(); avui.setHours(0,0,0,0);
-  if(iso(avui)!==DS) location.reload(); else { pintar(); reintentarFotos(); }
+  pintar(); reintentarFotos();
 });
 </script>
 </body>

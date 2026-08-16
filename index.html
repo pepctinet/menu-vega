@@ -289,10 +289,10 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<script src="firebase-config.js?v=2026-08-15d"></script>
-<script src="core.js?v=2026-08-15d"></script>
-<script src="nutri.js?v=2026-08-15d"></script>
-<script src="sync.js?v=2026-08-15d"></script>
+<script src="firebase-config.js?v=2026-08-16a"></script>
+<script src="core.js?v=2026-08-16a"></script>
+<script src="nutri.js?v=2026-08-16a"></script>
+<script src="sync.js?v=2026-08-16a"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -307,7 +307,7 @@ tr:last-child td{border-bottom:none}
 /* Empremta SHA-256 de la contrasenya. Al codi no hi ha el text de la
    contrasenya: només aquesta empremta, de la qual no es pot recuperar.
    Per canviar-la, calcula l'SHA-256 de la nova i substitueix-la aquí. */
-let cursor = monday(TODAY);
+let cursor = monday(avui());
 let tab = "setmana";
 
 /* ---------------------------------------------------------------------
@@ -446,7 +446,7 @@ function llegendaMarques(o){
 }
 
 function viewSetmana(){
-  const seg = weekKey(cursor)===weekKey(addDays(TODAY,7));
+  const seg = weekKey(cursor)===weekKey(addDays(avui(),7));
   let html = `<div class="sec-title"><h2>Planificació setmanal</h2>
     <span class="muted small">Clica un àpat per triar-lo o canviar-lo</span>
     <span style="margin-left:auto" class="no-print">
@@ -462,14 +462,15 @@ function viewSetmana(){
 
   for(let i=0;i<7;i++){
     const dt = addDays(cursor,i), ds = iso(dt), day = dayData(ds);
-    const avui = ds===iso(TODAY), passat = dt<TODAY, val = esValidat(day);
+    const ara = avui();
+    const esAvui = ds===iso(ara), passat = dt<ara, val = esValidat(day);
     const chk = checkDay(day);
     const sc  = obert ? scoreDayFull(day) : null;
     const teMenu = chk.fets>0;
-    html += `<div class="day${avui?" today":""}${passat?" past":""}${val?" val":""}">
+    html += `<div class="day${esAvui?" today":""}${passat?" past":""}${val?" val":""}">
       <div class="dhead"><div class="spread">
         <div><div class="dn">${DIES[i]}</div>
-        <div class="dd">${fmtDay(dt)}${val?" · validat":avui?" · avui":passat?" · passat":""}</div></div>
+        <div class="dd">${fmtDay(dt)}${val?" · validat":esAvui?" · avui":passat?" · passat":""}</div></div>
         ${teMenu ? boleta(chk.complet, false) : ""}
       </div></div><div class="dbody">`;
     for(const m of MEALS){
@@ -892,13 +893,13 @@ function desarObjectius(){
    PROGRAMACIÓ DE SETMANES
    ===================================================================== */
 function proposar(){
-  const n = proposarSetmana(cursor, {desde:TODAY});
+  const n = proposarSetmana(cursor, {desde:avui()});
   guardarSetmanaSencera();
   if(!n) alert("Aquesta setmana ja està completa o els dies són anteriors a avui.");
   render();
 }
 function programarSeguent(){
-  cursor = addDays(monday(TODAY), 7);
+  cursor = addDays(monday(avui()), 7);
   proposarSetmana(cursor, {desde:cursor});
   guardarSetmanaSencera();
   tab = "setmana"; render();
@@ -908,7 +909,7 @@ function copiarSetmana(){
   let n = 0;
   for(let i=0;i<7;i++){
     const dt = addDays(cursor,i);
-    if(dt < TODAY) continue;
+    if(dt < avui()) continue;
     const day = dayData(iso(dt));
     if(esValidat(day)) continue;
     const src = prev[iso(addDays(cursor,-7+i))];
@@ -924,7 +925,7 @@ function buidarSetmana(){
   if(!confirm("Vols esborrar els menús d'aquesta setmana a partir d'avui? Els dies validats i els passats es conserven.")) return;
   for(let i=0;i<7;i++){
     const dt = addDays(cursor,i);
-    if(dt < TODAY) continue;
+    if(dt < avui()) continue;
     const day = dayData(iso(dt));
     if(esValidat(day)) continue;
     day.meals = {}; day.postres = {};
@@ -2255,7 +2256,7 @@ function treureMissatge(id){
    ===================================================================== */
 let pesRang = 90;   // dies enrere que es mostren
 function viewPes(){
-  const fins = TODAY, desde = addDays(TODAY, -pesRang);
+  const fins = avui(), desde = addDays(fins, -pesRang);
   const serie = seriePes(desde, fins);
   const tot = seriePes();
   let h = `<div class="sec-title"><h2>Pes</h2>
@@ -2263,7 +2264,7 @@ function viewPes(){
     <span style="margin-left:auto" class="no-print">`+
     [[30,"30 dies"],[90,"3 mesos"],[365,"1 any"],[9999,"Tot"]].map(([d,n])=>
       `<button class="btn ${pesRang===d?"":"ghost"} sm" onclick="pesRang=${d};render()">${n}</button>`).join(" ")+
-    ` <button class="btn ghost sm" onclick="editarPes('${iso(TODAY)}')">+ Afegir una pesada</button></span></div>`;
+    ` <button class="btn ghost sm" onclick="editarPes('${iso(avui())}')">+ Afegir una pesada</button></span></div>`;
 
   if(!tot.length) return h+`<div class="card pad muted">
     Encara no hi ha cap pesada registrada. Pots afegir-ne una des d'aquí, o des de
@@ -2283,7 +2284,7 @@ function viewPes(){
   h += `<div class="sec-title"><h2>Diari</h2>
     <span class="muted small">${diari.length} entrades · pesades i observacions</span>
     <span style="margin-left:auto" class="no-print">
-      <button class="btn ghost sm" onclick="editarNota('${iso(TODAY)}')">+ Anotar un dia sense pesada</button>
+      <button class="btn ghost sm" onclick="editarNota('${iso(avui())}')">+ Anotar un dia sense pesada</button>
     </span></div>
     <div class="card pad"><table>
     <tr><th>Dia</th><th style="text-align:right">Pes</th><th>Condicions</th><th>Observacions</th><th></th></tr>`;
@@ -2931,12 +2932,12 @@ function render(){
   $("#tabs").innerHTML = T.map(x=>
     `<button class="${tab===x.id?"on":""}" onclick="tab='${x.id}';render()">${x.n}</button>`).join("");
   $("#wlbl").textContent = fmtDay(cursor)+" – "+fmtDay(addDays(cursor,6))+
-    (weekKey(cursor)===weekKey(TODAY)?" · actual":"");
+    (weekKey(cursor)===weekKey(avui())?" · actual":"");
   $("#view").innerHTML = (T.find(x=>x.id===tab)||T[0]).f();
 }
 $("#wprev").onclick  = ()=>{ cursor = addDays(cursor,-7); render(); };
 $("#wnext").onclick  = ()=>{ cursor = addDays(cursor, 7); render(); };
-$("#wtoday").onclick = ()=>{ cursor = monday(TODAY); render(); };
+$("#wtoday").onclick = ()=>{ cursor = monday(avui()); render(); };
 
 function pintarSinc(e, canvis){
   const p = $("#estatSinc .p");
@@ -2951,6 +2952,11 @@ function pintarSinc(e, canvis){
 
 render();
 Sync.init(pintarSinc);
+
+/* Canvi de dia. No es mou el cursor de setmana: si ell està mirant una
+   setmana concreta, moure-l'hi seria pitjor. Només es repinta, i el
+   botó "avui" ja el porta on toca. */
+vigilarCanviDeDia(()=>render());
 </script>
 </body>
 </html>
