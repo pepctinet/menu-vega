@@ -308,12 +308,35 @@ const KEY = NOMES_GUIA ? "menuvega_mobil_v1" : "menuvega_v2";
 /* El que el mòbil pot tenir. Tota la resta, encara que arribi, no es desa. */
 const CAMPS_GUIA = ["weeks","custom","customIng","editsPlats","platsAmagats","editsIng",
   "racions","racionsHist","apatsFixos","apatsFixosHist","indicacions","indicacionsNoves",
-  "habitsEdit","habitsNous","metaRev","rev","savedAt"];
+  "habitsEdit","habitsNous","cuaFotosEsborrades","metaRev","rev","savedAt"];
+
+/* La supervisio es va desar inicialment dins de cada dia. Aixo feia que
+   viatges amb les setmanes que necessita el mobil. Els adults la migren
+   al mapa privat; el mobil nomes l'elimina. En tots dos casos desapareix
+   del dia abans que pugui quedar en memoria o al disc. */
+function extreureSupervisioDies(s, conservar){
+  if(!s || !s.weeks) return false;
+  if(conservar) s.supervisio = s.supervisio || {};
+  let canviat = false;
+  for(const setmana of Object.values(s.weeks)) for(const [ds,dia] of Object.entries(setmana||{})){
+    if(!dia || !dia.supervisio) continue;
+    const valors = Object.assign({}, dia.supervisio);
+    if(conservar && Object.keys(valors).length){
+      const antic = s.supervisio[ds];
+      if(!antic || (dia.u||0) >= (antic.u||0))
+        s.supervisio[ds] = {valors, u:dia.u||0};
+    }
+    delete dia.supervisio;
+    canviat = true;
+  }
+  return canviat;
+}
 
 /* Passada de neteja: del telèfon en surt tot el que no sigui la guia.
    Es fa servir en carregar i cada vegada que arriben canvis del servidor. */
 function nomesGuia(s){
   if(!s) return s;
+  extreureSupervisioDies(s, false);
   for(const k of Object.keys(s)) if(!CAMPS_GUIA.includes(k)) delete s[k];
   /* Els valors nutricionals viuen dins dels aliments personalitzats:
      no n'hi ha prou de mirar les claus de primer nivell. */
@@ -341,6 +364,7 @@ function loadState(){
   }
   if(!s) s = {};
   if(NOMES_GUIA) nomesGuia(s);
+  else extreureSupervisioDies(s, true);
   s.weeks    = s.weeks    || {};   // {setmana: {data: {meals,postres,habits,validat,fotos}}}
   s.custom   = s.custom   || [];   // plats creats de nou
   s.customIng= s.customIng|| {};   // aliments creats de nou
@@ -365,6 +389,11 @@ function loadState(){
   s.pesos       = s.pesos       || {};  // {data: {kg, hora, nota, u}}
   s.diari       = s.diari       || {};  // {data: {text, u}} observacions sense pesada
   s.documents   = s.documents   || [];  // fitxers adjunts als missatges
+  if(!NOMES_GUIA) s.supervisio = s.supervisio || {}; // acompanyament, nomes adults
+  /* Cues locals i persistents: si s'esborra sense xarxa, l'operacio es
+     repren en tornar a entrar. La del mobil nomes conte data i apat. */
+  s.cuaFotosEsborrades = s.cuaFotosEsborrades || {};
+  if(!NOMES_GUIA) s.cuaDocumentsEsborrats = s.cuaDocumentsEsborrats || {};
   s.target   = s.target   || null; // objectius numèrics (només ordinador)
   s.pantry   = s.pantry   || {};
   s.rev      = s.rev      || 0;    // revisió, per a la sincronització
@@ -390,6 +419,140 @@ function saveState(silent){
     console.warn("No s'ha pogut desar en local:", e);
   }
   if(!silent && typeof Sync!=="undefined" && Sync.push) Sync.push();
+}
+
+/* ---------------------------------------------------------------------
+   COPIES DE SEGURETAT VERSIONADES
+   --------------------------------------------------------------------- */
+const COPIA_TIPUS = "menu-vega";
+const COPIA_VERSIO = 1;
+const CAMPS_COPIA = [
+  "weeks","custom","customIng","editsPlats","platsAmagats","editsIng",
+  "racions","racionsHist","apatsFixos","apatsFixosHist","indicacions",
+  "indicacionsNoves","habitsEdit","habitsNous","canvis","missatges",
+  "pesos","diari","documents","target","targetHist","pantry","supervisio"
+];
+const CAMPS_IMPORT_IGNORATS = [
+  "rev","metaRev","privatRev","savedAt","cuaFotosEsborrades","cuaDocumentsEsborrats"
+];
+const OBJECTES_COPIA = [
+  "weeks","customIng","editsPlats","editsIng","racions","apatsFixos",
+  "indicacions","habitsEdit","pesos","diari","pantry","supervisio"
+];
+const LLISTES_COPIA = [
+  "custom","platsAmagats","racionsHist","apatsFixosHist","indicacionsNoves",
+  "habitsNous","canvis","missatges","documents","targetHist"
+];
+const CLAUS_PERILLOSES = new Set(["__proto__","prototype","constructor"]);
+
+const esObjectePla = v => !!v && typeof v==="object" && !Array.isArray(v);
+const clonarJSON = v => JSON.parse(JSON.stringify(v));
+
+function validarArbreCopia(v, profunditat, comptador){
+  profunditat = profunditat||0;
+  comptador = comptador||{n:0};
+  if(profunditat>16) throw new Error("La còpia té una estructura massa profunda.");
+  if(++comptador.n>150000) throw new Error("La còpia conté massa elements.");
+  if(v===null || ["string","number","boolean"].includes(typeof v)){
+    if(typeof v==="number" && !Number.isFinite(v)) throw new Error("La còpia conté un número no vàlid.");
+    return;
+  }
+  if(Array.isArray(v)){
+    for(const x of v) validarArbreCopia(x,profunditat+1,comptador);
+    return;
+  }
+  if(!esObjectePla(v)) throw new Error("La còpia conté un valor no admès.");
+  for(const [k,x] of Object.entries(v)){
+    if(CLAUS_PERILLOSES.has(k)) throw new Error("La còpia conté una clau no permesa: "+k);
+    validarArbreCopia(x,profunditat+1,comptador);
+  }
+}
+
+function seleccionarDadesCopia(origen){
+  const dades = {};
+  for(const k of CAMPS_COPIA) if(origen && origen[k]!==undefined) dades[k]=clonarJSON(origen[k]);
+  return dades;
+}
+
+function crearCopia(origen){
+  return {tipus:COPIA_TIPUS, versio:COPIA_VERSIO,
+          creada:new Date().toISOString(), dades:seleccionarDadesCopia(origen||S)};
+}
+
+function resumCopia(dades){
+  let setmanes=0,dies=0,apats=0;
+  for(const setmana of Object.values(dades.weeks||{})){
+    setmanes++;
+    for(const dia of Object.values(setmana||{})){
+      dies++;
+      const ids = new Set();
+      for(const camp of ["meals","custom","fora"])
+        for(const id of Object.keys((dia&&dia[camp])||{})) ids.add(id);
+      apats += ids.size;
+    }
+  }
+  return {setmanes,dies,apats,
+    plats:(dades.custom||[]).length,
+    pesos:Object.keys(dades.pesos||{}).length,
+    missatges:(dades.missatges||[]).length,
+    documents:(dades.documents||[]).length};
+}
+
+function validarCopia(entrada){
+  if(!esObjectePla(entrada)) throw new Error("L'arrel de la còpia ha de ser un objecte.");
+  validarArbreCopia(entrada);
+  const avisos=[];
+  let dades;
+  if(entrada.tipus!==undefined || entrada.versio!==undefined || entrada.dades!==undefined){
+    if(entrada.tipus!==COPIA_TIPUS) throw new Error("Aquesta còpia no és de Menú Vega.");
+    if(entrada.versio!==COPIA_VERSIO)
+      throw new Error("Versió de còpia no compatible: "+String(entrada.versio));
+    if(!esObjectePla(entrada.dades)) throw new Error("La còpia no conté cap estat vàlid.");
+    dades=entrada.dades;
+  }else{
+    dades=entrada;
+    avisos.push("És una còpia antiga sense versió; es convertirà al format actual.");
+  }
+
+  const admeses = new Set(CAMPS_COPIA.concat(CAMPS_IMPORT_IGNORATS));
+  const desconegudes = Object.keys(dades).filter(k=>!admeses.has(k));
+  if(desconegudes.length) throw new Error("La còpia conté camps desconeguts: "+desconegudes.join(", "));
+  if(CAMPS_IMPORT_IGNORATS.some(k=>dades[k]!==undefined))
+    avisos.push("Les revisions i cues tècniques de la còpia no es restauraran.");
+  for(const k of OBJECTES_COPIA)
+    if(dades[k]!==undefined && !esObjectePla(dades[k])) throw new Error("El camp "+k+" ha de ser un objecte.");
+  for(const k of LLISTES_COPIA)
+    if(dades[k]!==undefined && !Array.isArray(dades[k])) throw new Error("El camp "+k+" ha de ser una llista.");
+  if(dades.target!==undefined && dades.target!==null && !esObjectePla(dades.target))
+    throw new Error("El camp target no és vàlid.");
+
+  for(const [wk,setmana] of Object.entries(dades.weeks||{})){
+    if(!/^\d{4}-W\d{2}$/.test(wk) || !esObjectePla(setmana))
+      throw new Error("Setmana no vàlida: "+wk);
+    for(const [ds,dia] of Object.entries(setmana)){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(ds) || !esObjectePla(dia))
+        throw new Error("Dia no vàlid: "+ds);
+      const data = parseDay(ds);
+      if(Number.isNaN(data.getTime()) || iso(data)!==ds || weekKey(data)!==wk)
+        throw new Error("Dia fora de calendari o de setmana: "+ds);
+      for(const k of ["meals","custom","fora","sensacio","postres","fotos","auto","snap"])
+        if(dia[k]!==undefined && dia[k]!==null && !esObjectePla(dia[k])) throw new Error("Camp "+k+" no vàlid al dia "+ds);
+      if(dia.habits!==undefined && !Array.isArray(dia.habits)) throw new Error("Hàbits no vàlids al dia "+ds);
+      if(dia.u!==undefined && !Number.isFinite(dia.u)) throw new Error("Marca de temps no vàlida al dia "+ds);
+    }
+  }
+
+  const net = seleccionarDadesCopia(dades);
+  const defectesObjecte = ["weeks","customIng","editsPlats","editsIng","racions","apatsFixos",
+    "indicacions","habitsEdit","pesos","diari","pantry","supervisio"];
+  const defectesLlista = ["custom","platsAmagats","racionsHist","apatsFixosHist","indicacionsNoves",
+    "habitsNous","canvis","missatges","documents","targetHist"];
+  for(const k of defectesObjecte) if(net[k]===undefined) net[k]={};
+  for(const k of defectesLlista) if(net[k]===undefined) net[k]=[];
+  if(net.target===undefined) net.target=null;
+  /* Una còpia antiga també pot portar la supervisió dins dels dies. */
+  extreureSupervisioDies(net,true);
+  return {dades:net, resum:resumCopia(net), avisos, versio:COPIA_VERSIO};
 }
 
 /* Aliments = els del programa (amb les modificacions que s'hi hagin fet)
@@ -550,7 +713,8 @@ function dayData(dateStr){
   d.custom   = d.custom   || {};   // àpat que ella ha construït element a element
   d.fora     = d.fora     || {};   // àpat fet fora de casa, en text
   d.sensacio = d.sensacio || {};   // v | t | r  (mai se li mostra l'històric)
-  d.supervisio = d.supervisio || {}; // sup | prep | sola (el marca el pare)
+  /* La supervisio no viu dins del dia: les setmanes arriben al mobil. */
+  if(d.supervisio) delete d.supervisio;
   d.postres  = d.postres  || {};
   d.habits   = d.habits   || [];
   d.fotos    = d.fotos    || {};
@@ -582,11 +746,19 @@ const SUPERVISIO = [
 const COLOR_SUP = "#5b6b7a";      // gris blavós, sense càrrega de valor
 
 function marcarSupervisio(dataStr, mealId, val){
-  const day = dayData(dataStr);
-  if(!val || day.supervisio[mealId] === val) delete day.supervisio[mealId];
-  else day.supervisio[mealId] = val;
+  if(NOMES_GUIA) return;
+  S.supervisio = S.supervisio || {};
+  const registre = S.supervisio[dataStr] || {valors:{}, u:0};
+  registre.valors = registre.valors || {};
+  if(!val || registre.valors[mealId] === val) delete registre.valors[mealId];
+  else registre.valors[mealId] = val;
+  registre.u = Date.now();
+  S.supervisio[dataStr] = registre;
 }
-const supervisioDe = (day, mealId) => (day && day.supervisio) ? day.supervisio[mealId] : null;
+const supervisioDe = (dataStr, mealId) => {
+  const r = !NOMES_GUIA && S.supervisio && S.supervisio[dataStr];
+  return r && r.valors ? (r.valors[mealId] || null) : null;
+};
 
 /* ---------------------------------------------------------------------
    Què hi ha en un àpat d'un dia. Té tres orígens possibles i aquesta
@@ -1871,7 +2043,8 @@ if (typeof module !== "undefined") module.exports = {
   ING, MEALS, DIES, BASE_DISHES, POSTRES, CATS, QTY_REF,
   HABITS_BASE, habits, totsElsHabits, nomHabit,
   APATS_FIXOS_BASE, apatsFixos, INDICACIONS_BASE, indicacions,
-  loadState, saveState, nomesGuia, CAMPS_GUIA, KEY,
+  loadState, saveState, nomesGuia, extreureSupervisioDies, CAMPS_GUIA, KEY,
+  crearCopia, validarCopia, resumCopia, COPIA_TIPUS, COPIA_VERSIO, CAMPS_COPIA,
   lapida, esborrat, missatgesVius, documentsVius, pesosVius, diariViu,
   treurePes, desarNotaDia, notaDia, esborrarMissatge, diariComplet, seriePes,
   allIng, ing, DISHES, dishById, iso, monday, addDays,
@@ -1888,6 +2061,7 @@ if (typeof module !== "undefined") module.exports = {
   fotografiarDia, teFotografia, apatDelDiaViu, recalcularPlat,
   previsioActualitzacio, aplicarActualitzacio, arrodonirQty,
   checkItems, equivalents, opcionsGrup, comptaRacions, apatsFets,
-  SENSACIONS, SUPERVISIO, structure, DISHES, totsElsPlats,
+  SENSACIONS, SUPERVISIO, marcarSupervisio, supervisioDe,
+  structure, DISHES, totsElsPlats,
   get S(){ return S; }, set S(v){ S = v; },
 };

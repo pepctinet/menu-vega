@@ -280,19 +280,22 @@ tr:last-child td{border-bottom:none}
 
 <main class="wrap" id="view"></main>
 
-<div class="ov" id="ov"><div class="modal" id="modal"></div></div>
-<div class="zoom" id="zoom">
-  <button class="creu" onclick="tancarZoom()" title="Tancar">×</button>
+<div class="ov" id="ov" aria-hidden="true"><div class="modal" id="modal"
+  role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></div></div>
+<div class="zoom" id="zoom" role="dialog" aria-modal="true"
+  aria-label="Fotografia ampliada" aria-hidden="true" tabindex="-1">
+  <button class="creu" onclick="tancarZoom()" title="Tancar" aria-label="Tancar la fotografia">×</button>
   <div class="caixa">
     <img id="zoomImg" alt="">
     <button class="tancar" onclick="tancarZoom()">Tancar la fotografia</button>
   </div>
 </div>
 
-<script src="firebase-config.js?v=2026-08-16b"></script>
-<script src="core.js?v=2026-08-16b"></script>
-<script src="nutri.js?v=2026-08-16b"></script>
-<script src="sync.js?v=2026-08-16b"></script>
+<script src="firebase-config.js?v=2026-08-16i"></script>
+<script src="core.js?v=2026-08-16i"></script>
+<script src="nutri.js?v=2026-08-16i"></script>
+<script src="sync.js?v=2026-08-16i"></script>
+<script src="registre-sw.js?v=2026-08-16i"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -331,12 +334,18 @@ function pintarPorta(){
   const cal = Sync.configurat() && !sessioIniciada() && Sync.est.estat!=="error"
               && Sync.est.estat!=="carregant";
   let p = document.getElementById("porta");
-  if(!cal){ if(p) p.remove(); return; }
+  if(!cal){
+    if(p) p.remove();
+    if(!modalObert() && !$("#zoom").classList.contains("on")) posarFonsInert(false);
+    return;
+  }
   if(p) return;
   p = document.createElement("div");
   p.className = "porta"; p.id = "porta";
+  p.setAttribute("role","dialog"); p.setAttribute("aria-modal","true");
+  p.setAttribute("aria-labelledby","porta-title");
   p.innerHTML = `<div class="box">
-      <h2>Seguiment Mar</h2>
+      <h2 id="porta-title">Accés al seguiment</h2>
       <div class="s">Inicia la sessió amb el teu compte</div>
       <input id="poEmail" type="email" placeholder="Usuari" autocomplete="username">
       <input id="poPass" type="password" placeholder="Contrasenya" autocomplete="current-password">
@@ -346,12 +355,17 @@ function pintarPorta(){
         i la psicòloga. Queda registrat qui modifica el pla.</div>
     </div>`;
   document.body.appendChild(p);
+  posarFonsInert(true);
   const em = document.getElementById("poEmail");
   const pw = document.getElementById("poPass");
   const anar = e => { if(e.key==="Enter") entrarPorta(); };
   em.addEventListener("keydown", anar); pw.addEventListener("keydown", anar);
   setTimeout(()=>em.focus(), 60);
 }
+document.addEventListener("keydown",e=>{
+  const p=document.getElementById("porta");
+  if(p) atraparFocus(e,p);
+});
 async function entrarPorta(){
   const err = document.getElementById("poErr");
   err.textContent = "";
@@ -481,7 +495,7 @@ function viewSetmana(){
       const foto = day.fotos && day.fotos[m.id];
       const sens = day.sensacio && day.sensacio[m.id];
       const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
-      const sup = supervisioDe(day, m.id);
+      const sup = supervisioDe(ds, m.id);
       const sx = sup ? SUPERVISIO.find(x=>x.id===sup) : null;
       html += `<div class="slot${val?" block":""}" ${val?"":`onclick="obrirTria('${escJs(ds)}','${escJs(m.id)}')"`}>
         <div class="row" style="justify-content:space-between">
@@ -553,29 +567,73 @@ function viewSetmana(){
 /* =====================================================================
    MODALS
    ===================================================================== */
+let focusAbansDialeg = null;
+function posarFonsInert(estat){
+  for(const x of [document.querySelector("header"),document.getElementById("view")])
+    if(x) x.inert=estat;
+  document.body.style.overflow=estat?"hidden":"";
+}
+function focusables(caixa){
+  return Array.from(caixa.querySelectorAll(
+    'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+    .filter(x=>!x.hidden && x.getAttribute("aria-hidden")!=="true");
+}
+function atraparFocus(e,caixa){
+  if(e.key!=="Tab") return;
+  const f=focusables(caixa); if(!f.length){e.preventDefault();caixa.focus();return;}
+  const primer=f[0],ultim=f[f.length-1];
+  if(e.shiftKey && document.activeElement===primer){e.preventDefault();ultim.focus();}
+  else if(!e.shiftKey && document.activeElement===ultim){e.preventDefault();primer.focus();}
+}
 function openModal(html, narrow){
+  focusAbansDialeg=document.activeElement;
   $("#modal").className = "modal"+(narrow?" narrow":"");
   /* El peu s'afegeix sempre aquí, no a cada crida: així cap quadre no es
      queda sense dir com es tanca. */
   $("#modal").innerHTML = html +
     `<div class="tancapeu no-print">Prem <b>Escape</b> o clica fora per tancar</div>`;
+  const titol=$("#modal").querySelector("h1,h2,h3");
+  if(titol) titol.id="modal-title";
+  for(const b of $("#modal").querySelectorAll("button.close"))
+    if(!b.getAttribute("aria-label")) b.setAttribute("aria-label","Tancar");
+  $("#ov").setAttribute("aria-hidden","false");
+  posarFonsInert(true);
   $("#ov").classList.add("on");
+  requestAnimationFrame(()=>{const f=focusables($("#modal"));(f[0]||$("#modal")).focus();});
 }
-function closeModal(){ $("#ov").classList.remove("on"); }
+function closeModal(){
+  if(!modalObert()) return;
+  $("#ov").classList.remove("on");
+  $("#ov").setAttribute("aria-hidden","true");
+  posarFonsInert(false);
+  if(focusAbansDialeg&&focusAbansDialeg.isConnected) focusAbansDialeg.focus();
+  focusAbansDialeg=null;
+}
 const modalObert = () => $("#ov").classList.contains("on");
 $("#ov").addEventListener("click", e=>{ if(e.target.id==="ov") closeModal(); });
 /* Es tancaven clicant a fora i prou, sense dir-ho enlloc. Ara també amb
    Escape, i cada quadre ho anuncia a sota. */
 document.addEventListener("keydown", e=>{
-  if(e.key==="Escape" && modalObert()) closeModal();
+  if(!modalObert()) return;
+  if(e.key==="Escape") closeModal();
+  else atraparFocus(e,$("#modal"));
 });
-function obrirZoom(url){ $("#zoomImg").src = url; $("#zoom").classList.add("on"); }
-function tancarZoom(){ $("#zoom").classList.remove("on"); }
+function obrirZoom(url){
+  focusAbansDialeg=document.activeElement; $("#zoomImg").src=url;
+  posarFonsInert(true); $("#zoom").setAttribute("aria-hidden","false");
+  $("#zoom").classList.add("on"); requestAnimationFrame(()=>$("#zoom").focus());
+}
+function tancarZoom(){
+  $("#zoom").classList.remove("on"); $("#zoom").setAttribute("aria-hidden","true");
+  posarFonsInert(false);
+  if(focusAbansDialeg&&focusAbansDialeg.isConnected) focusAbansDialeg.focus();
+  focusAbansDialeg=null;
+}
 $("#zoom").addEventListener("click", e=>{ if(e.target.id==="zoom") tancarZoom(); });
 document.addEventListener("keydown", e=>{
-  if(e.key!=="Escape") return;
-  if($("#zoom").classList.contains("on")) tancarZoom();
-  else closeModal();
+  if(!$("#zoom").classList.contains("on")) return;
+  if(e.key==="Escape") tancarZoom();
+  else atraparFocus(e,$("#zoom"));
 });
 
 let triaCtx = null;
@@ -782,7 +840,7 @@ function obrirDia(ds){
       ${c && c.falten.length ? `<div class="xs muted">Hi falta: ${c.falten.map(esc).join(" · ")}</div>` : ""}
       ${sd ? `<div class="xs" style="margin-top:2px"><span class="quad" style="background:${sd.color}"></span>
           <span class="muted"> s'hi ha sentit ${esc(sd.n.toLowerCase())}</span></div>` : ""}
-      ${(()=>{ const sp=supervisioDe(day,m.id); const sx=sp?SUPERVISIO.find(x=>x.id===sp):null;
+      ${(()=>{ const sp=supervisioDe(ds,m.id); const sx=sp?SUPERVISIO.find(x=>x.id===sp):null;
          return sx?`<div class="xs" style="margin-top:2px"><span class="sup ${sx.omplert}"></span>
            <span class="muted"> ${esc(sx.n.toLowerCase())}</span></div>`:""; })()}</td>
       <td style="width:34px">${a ? boleta(c ? c.complet : true, false) : ""}</td></tr>`;
@@ -1728,11 +1786,17 @@ function copiarCompra(){
    HISTORIAL
    ===================================================================== */
 let obertes = {};
+function avisHistorialParcial(){
+  return `<div class="warn small" style="margin-bottom:14px"><b>Abast de l'historial:</b>
+    aquest dispositiu baixa automàticament les últimes 8 setmanes. Les dades
+    anteriors només hi surten si ja s'havien desat en aquest mateix dispositiu.</div>`;
+}
 function viewHistorial(){
   const keys = Object.keys(S.weeks).filter(k =>
     Object.values(S.weeks[k]).some(d=>Object.keys(d.meals||{}).length)).sort().reverse();
   let h = `<div class="sec-title"><h2>Historial</h2>
     <span class="muted small">Consulta el que s'ha fet en setmanes anteriors</span></div>`;
+  h += avisHistorialParcial();
   if(!keys.length) return h+`<div class="card pad muted">Encara no hi ha res desat.</div>`;
 
   let nd=0, nv=0, neq=0, tk=0, tp=0;
@@ -1810,6 +1874,7 @@ function viewRegistre(){
     <span style="margin-left:auto" class="no-print">
       <button class="btn ghost sm" onclick="window.print()">Imprimir o desar en PDF</button>
       <button class="btn ghost sm" onclick="exportarRegistre()">Exportar en text</button></span></div>`;
+  h += avisHistorialParcial();
   if(!dies.length) return h+`<div class="card pad muted">
     Encara no hi ha cap dia validat. Valida un dia des de la vista de setmana
     o des del seu detall perquè quedi al registre.</div>`;
@@ -1828,7 +1893,7 @@ function viewRegistre(){
         if(!a) return "";
         const sens = day.sensacio && day.sensacio[m.id];
         const sd = sens ? SENSACIONS.find(x=>x.id===sens) : null;
-        const sup = supervisioDe(day, m.id);
+        const sup = supervisioDe(ds, m.id);
         const sx = sup ? SUPERVISIO.find(x=>x.id===sup) : null;
         /* La sensació és un QUADRAT, igual que a la setmana i al detall
            del dia. Aquí hi havia un cercle i es confonia amb la marca
@@ -1921,7 +1986,7 @@ function analitzar(dies){
       const s = day.sensacio && day.sensacio[m.id];
       if(s){ r.sensPerApat[m.id][s]++; r.sensPerApat[m.id].total++; r.sensTotal[s]++; }
       else r.senseSens++;
-      const sp = supervisioDe(day, m.id);
+      const sp = supervisioDe(ds, m.id);
       if(sp && r.sup[sp]!=null){ r.sup[sp]++; r.supPerApat[m.id][sp]++; r.supPerApat[m.id].total++; }
       else r.sup.sense++;
     }
@@ -1939,6 +2004,7 @@ function viewSeguiment(){
       `<button class="btn ${periode===k?"":"ghost"} sm" onclick="periode='${k}';render()">${v}</button>`).join(" ")+
     ` <button class="btn ghost sm" onclick="window.print()">Imprimir o desar en PDF</button>
       <button class="btn ghost sm" onclick="copiarSeguiment()">Copiar el text</button></span></div>`;
+  h += avisHistorialParcial();
 
   if(!dies.length) return h+`<div class="card pad muted">No hi ha cap dia amb menú en aquest període.</div>`;
   const r = analitzar(dies);
@@ -2399,7 +2465,7 @@ function barraEspai(){
   const color = alerta ? "var(--vermell)" : avis ? "var(--groc)" : "var(--verd)";
   return `<div class="card pad" style="margin-bottom:14px">
     <div class="spread">
-      <div><b>${mb(t.bytes)}</b> de l'espai gratuït (1 GB)
+      <div><b>${mb(t.bytes)}</b> estimats de l'espai gratuït (1 GB)
         <div class="xs muted">
           ${t.fotos.n} fotografi${t.fotos.n===1?"a":"es"} · ${mb(t.fotos.bytes)}
           &nbsp;·&nbsp;
@@ -2424,12 +2490,13 @@ function viewFotos(){
   const alerta = e.percentatge >= 80;
   let h = `<div class="sec-title"><h2>Fotografies</h2>
     <span class="muted small">Les que s'han fet des del mòbil</span></div>`;
+  h += avisHistorialParcial();
   if(e.n){
     h += `<div class="card pad" style="margin-bottom:14px">
       <div class="spread">
         <div><b>${e.n}</b> ${e.n===1?"fotografia":"fotografies"}
           <div class="xs muted">${mb<1 ? Math.round(e.bytes/1024)+" kB" : mb.toFixed(1)+" MB"}
-          de l'espai gratuït (1 GB)</div></div>
+          estimats de l'espai gratuït (1 GB)</div></div>
         <div class="small ${alerta?"":"muted"}" style="${alerta?"color:var(--vermell);font-weight:700":""}">
           ${e.percentatge<0.1 ? "menys del 0,1" : e.percentatge.toFixed(1)} %</div>
       </div>
@@ -2438,8 +2505,8 @@ function viewFotos(){
       ${alerta ? `<div class="small" style="color:var(--vermell);margin-top:8px">
         L'espai gratuït s'està acabant. Val la pena esborrar les fotografies més antigues
         des del detall de cada dia.</div>`
-      : `<div class="xs muted" style="margin-top:8px">A aquest ritme hi caben uns
-         ${Math.max(1,Math.round((e.limit-e.bytes)/(e.bytes/e.n)/5/365))} anys més de fotografies.</div>`}
+      : `<div class="xs muted" style="margin-top:8px">Estimació que inclou la codificació
+         base64 i una petita sobrecàrrega per document.</div>`}
     </div>`;
   }
   h += `<div id="galTot"><div class="card pad muted">Carregant…</div></div>`;
@@ -2876,29 +2943,59 @@ async function entrar(){
   catch(e){ err.textContent = "No s'ha pogut entrar. Comprova el correu i la contrasenya."; }
 }
 function exportar(){
-  const b = new Blob([JSON.stringify(S,null,1)], {type:"application/json"});
+  descarregarCopia("copia");
+}
+function descarregarCopia(etiqueta){
+  const copia = crearCopia(S);
+  const b = new Blob([JSON.stringify(copia,null,1)], {type:"application/json"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(b);
-  a.download = "menu-vega-"+iso(new Date())+".json";
+  a.download = "menu-vega-"+(etiqueta||"copia")+"-"+iso(new Date())+".json";
   a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  return a.download;
 }
 function importar(inp){
   const f = inp.files[0]; if(!f) return;
+  if(f.size > 5*1024*1024){
+    inp.value="";
+    return alert("La còpia supera els 5 MB i no es pot revisar amb seguretat.");
+  }
   const r = new FileReader();
   r.onload = () => {
     try{
-      const dades = JSON.parse(r.result);
-      Object.assign(S, dades);
-      saveState(); Sync.push(); render();
-      alert("Còpia importada.");
-    }catch(e){ alert("El fitxer no és vàlid."); }
+      const revisada = validarCopia(JSON.parse(r.result));
+      const x = revisada.resum;
+      const avis = revisada.avisos.length ? "\n\nAvís: "+revisada.avisos.join(" ") : "";
+      const missatge = "Vista prèvia de la còpia:\n\n"+
+        x.setmanes+" setmanes · "+x.dies+" dies · "+x.apats+" àpats\n"+
+        x.plats+" plats propis · "+x.pesos+" pesades\n"+
+        x.missatges+" missatges · "+x.documents+" documents"+avis+
+        "\n\nAbans d'importar es descarregarà automàticament una còpia de l'estat actual. Continuar?";
+      if(!confirm(missatge)) return;
+
+      descarregarCopia("abans-importar");
+      for(const k of Object.keys(S)) delete S[k];
+      for(const [k,v] of Object.entries(revisada.dades)) S[k]=v;
+      /* Les cues descriuen operacions posteriors a una còpia, no dades
+         restaurables. Recuperar-les podria esborrar fitxers del servidor. */
+      S.cuaFotosEsborrades={}; S.cuaDocumentsEsborrats={};
+      saveState(true); Sync.push(); render();
+      alert("Còpia importada i sincronització iniciada.");
+    }catch(e){ alert("No s'ha importat res. "+(e&&e.message?e.message:"El fitxer no és vàlid.")); }
+    finally{ inp.value=""; }
   };
   r.readAsText(f);
 }
-function esborrarTot(){
+async function esborrarTot(){
   if(!confirm("Segur? S'esborraran tots els menús, plats i historial d'aquest aparell.")) return;
-  localStorage.removeItem(KEY);
-  location.reload();
+  try{
+    await Fotos.esborrarTot();
+    localStorage.removeItem(KEY);
+    location.reload();
+  }catch(e){
+    alert(e && e.message ? e.message : "No s'ha pogut esborrar l'emmagatzematge local.");
+  }
 }
 
 /* =====================================================================

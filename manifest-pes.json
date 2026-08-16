@@ -2,7 +2,7 @@
   "name": "Registre de pes",
   "short_name": "Pes",
   "start_url": "pes.html",
-  "scope": "pes.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f6f7f9",

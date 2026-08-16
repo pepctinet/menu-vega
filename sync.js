@@ -54,12 +54,27 @@ const Fotos = (() => {
       q.onerror   = () => res(null);
     });
   }
-  async function esborrar(ds, meal){
+  async function esborrarClau(k){
     const d = await obrir();
     return new Promise((res)=>{
       const tx = d.transaction(STORE,"readwrite");
-      tx.objectStore(STORE).delete(clau(ds,meal));
+      tx.objectStore(STORE).delete(k);
       tx.oncomplete = res; tx.onerror = res;
+    });
+  }
+  const esborrar = (ds,meal) => esborrarClau(clau(ds,meal));
+  const esborrarBlob = k => esborrarClau(k);
+
+  /* Esborrar l'estat principal no servia de res per als binaris: fotos i
+     adjunts continuaven dins d'IndexedDB. Tanquem primer la connexio i
+     eliminem la base sencera, que es la unitat real d'emmagatzematge. */
+  async function esborrarTot(){
+    if(db){ try{ db.close(); }catch(e){} db = null; }
+    return new Promise((res,rej)=>{
+      const r = indexedDB.deleteDatabase(DB);
+      r.onsuccess = () => res(true);
+      r.onerror = () => rej(r.error || new Error("No s'ha pogut buidar IndexedDB"));
+      r.onblocked = () => rej(new Error("Tanca les altres pestanyes de Menú Vega i torna-ho a provar."));
     });
   }
   async function claus(){
@@ -151,9 +166,15 @@ const Fotos = (() => {
     return new Blob([arr], {type:tipus||"application/octet-stream"});
   }
 
-  return {desar, llegir, esborrar, claus, comprimir, aBase64, deBase64, MAX_BYTES,
+  return {desar, llegir, esborrar, esborrarBlob, esborrarTot, claus,
+          comprimir, aBase64, deBase64, MAX_BYTES,
           desarBlob, llegirBlob, deBase64Tipus};
 })();
+
+/* Firebase desa els binaris com a text base64: cada grup de 3 bytes es
+   converteix en 4 caracters. El comptador ha de projectar el que ocupa al
+   servidor, no la mida original del fitxer. */
+const midaBase64 = n => Math.ceil(Math.max(0,Number(n)||0)/3)*4;
 
 
 /* ---------------------------------------------------------------------
@@ -227,10 +248,17 @@ const Sync = (() => {
         est.rol = await llegirRol(u.uid);
         est.estat="connectat"; est.missatge="Sincronitzat"; onCanvi(est);
         escoltar();
+        /* La supervisio antiga vivia dins de les setmanes compartides.
+           Un adult la passa a privat i la retira del servidor; el mobil
+           no executa mai aquesta migracio. */
+        if(!NOMES_GUIA) migrarSupervisioServidor();
         /* Tot el que s'hagi acumulat sense sessio surt ara. Abans no
            s'agendava res en connectar-se: els canvis fets sense connexio
            s'hi quedaven fins que en feies un de nou. */
         intentsFallits = 0;
+        if(Object.keys(S.cuaFotosEsborrades||{}).length ||
+           (!NOMES_GUIA && Object.keys(S.cuaDocumentsEsborrats||{}).length))
+          pendents.add("__esborrats__");
         if(pendents.size) programar();
       });
     }catch(e){
@@ -255,7 +283,7 @@ const Sync = (() => {
      Es el que el mobil necessita per dir-li que li toca menjar ara.
      El seguiment -pes, diari, missatges, documents i objectius- viu a
      "privat/seguiment", on el mobil no mira mai. */
-  const CAMPS_SEGUIMENT = ["pesos","diari","missatges","documents","canvis","target","targetHist"];
+  const CAMPS_SEGUIMENT = ["pesos","diari","missatges","documents","canvis","target","targetHist","supervisio"];
   const teSeguiment = r => CAMPS_SEGUIMENT.some(k => r[k] !== undefined);
 
   /* Ho passem d'un document a l'altre i ho esborrem del vell. Es fa amb
@@ -288,6 +316,62 @@ const Sync = (() => {
       }
     }
     return canviat;
+  }
+
+  /* La supervisio privada es fusiona per dia. Cada registre porta la
+     marca de temps de l'ultima modificacio; una copia antiga no pot
+     tornar enrere un canvi mes nou fet en un altre aparell. */
+  function fusionarSupervisio(remota){
+    S.supervisio = S.supervisio || {};
+    let canviat = false;
+    for(const [ds,valor] of Object.entries(remota||{})){
+      const r = valor && valor.valors ? valor : {valors:valor||{}, u:0};
+      const l = S.supervisio[ds];
+      if(!l || (r.u||0) > (l.u||0)){
+        S.supervisio[ds] = {valors:Object.assign({},r.valors||{}), u:r.u||0};
+        canviat = true;
+      }
+    }
+    return canviat;
+  }
+
+  /* Migracio unica de totes les setmanes, no nomes de les vuit que es
+     descarreguen en l'us normal. Primer es desa la copia privada i nomes
+     despres es retiren els camps dels dies compartits. Les actualitzacions
+     es fan dia per dia amb FieldPath: no reescriuen la resta de la setmana. */
+  let migrantSupervisio = false;
+  async function migrarSupervisioServidor(){
+    if(migrantSupervisio || NOMES_GUIA || est.estat!=="connectat") return;
+    migrantSupervisio = true;
+    try{
+      const snap = await dbf.collection("plans/"+PLA_ID+"/setmanes").get();
+      const netejar = [];
+      snap.forEach(doc=>{
+        const dies = (doc.data()&&doc.data().dies)||{};
+        for(const [ds,dia] of Object.entries(dies)){
+          if(!dia || !dia.supervisio) continue;
+          fusionarSupervisio({[ds]:{valors:dia.supervisio, u:dia.u||0}});
+          netejar.push({ref:doc.ref, ds});
+        }
+      });
+      if(!netejar.length) return;
+
+      /* Ordre deliberat: si falla la neteja, queda una copia duplicada;
+         si falles abans de desar privat i netegessim igual, es perdria. */
+      desarLocal();
+      await enviarPrivat();
+      for(let i=0;i<netejar.length;i+=400){
+        const batch = dbf.batch();
+        for(const x of netejar.slice(i,i+400))
+          batch.update(x.ref,
+            new firebase.firestore.FieldPath("dies",x.ds,"supervisio"),
+            firebase.firestore.FieldValue.delete());
+        await batch.commit();
+      }
+      console.info("Supervisio separada de les setmanes: "+netejar.length+" dies.");
+      onCanvi(est, true);
+    }catch(e){ console.warn("migrarSupervisio:",e); }
+    finally{ migrantSupervisio = false; }
   }
 
   /* Escoltem la configuració general i les setmanes des de 8 setmanes
@@ -358,6 +442,7 @@ const Sync = (() => {
         if(r.pesos)     canviat = fusionarPesos(r.pesos) || canviat;
         if(r.diari)     canviat = fusionarDiari(r.diari) || canviat;
         if(r.documents) canviat = fusionarDocuments(r.documents) || canviat;
+        if(r.supervisio) canviat = fusionarSupervisio(r.supervisio) || canviat;
         if(canviat){ desarLocal(); onCanvi(est, true); }
       }, e=>console.warn("privat:",e)));
 
@@ -378,7 +463,21 @@ const Sync = (() => {
   function fusionarSetmana(k, remots){
     const local = S.weeks[k] || (S.weeks[k]={});
     let canviat = false;
-    for(const [ds, dr] of Object.entries(remots)){
+    for(const [ds, original] of Object.entries(remots)){
+      /* Defensa en profunditat: ni tan sols en memoria deixem la dada
+         privada dins del dia que rep el mobil. L'adult l'absorbeix abans
+         de netejar-la; el mobil simplement la descarta. */
+      const dr = Object.assign({},original);
+      if(dr.supervisio){
+        if(!NOMES_GUIA){
+          fusionarSupervisio({[ds]:{valors:dr.supervisio,u:dr.u||0}});
+          pendents.add("__privat__");
+          pendents.add("dia:"+ds);
+          programar();
+        }
+        delete dr.supervisio;
+        canviat = true;
+      }
       const dl = local[ds];
       if(!dl || (dr.u||0) > (dl.u||0)){ local[ds] = dr; canviat = true; }
     }
@@ -458,6 +557,10 @@ const Sync = (() => {
     programar();
   }
   function pushDia(ds){ pendents.add("dia:"+ds); programar(); }
+  function pushPrivat(){
+    if(NOMES_GUIA) return;
+    pendents.add("__privat__"); programar();
+  }
   /* Es conserva pel codi antic que encara crida amb la clau de setmana */
   function pushSetmana(k){
     const setmana = S.weeks[k];
@@ -480,16 +583,30 @@ const Sync = (() => {
 
   async function enviarPrivat(){
     if(NOMES_GUIA) return;
-    S.privatRev = await seguentRevisio("privat/seguiment", S.privatRev);
-    await dbf.doc("plans/"+PLA_ID+"/privat/seguiment").set({
-      canvis:(S.canvis||[]).slice(0,300),
-      missatges:(S.missatges||[]).slice(0,300),
-      pesos:S.pesos||{}, diari:S.diari||{},
-      documents:(S.documents||[]).slice(0,200),
-      target:S.target||null, targetHist:S.targetHist||[],
-      rev:S.privatRev,
-      actualitzat: firebase.firestore.FieldValue.serverTimestamp()
-    }, {merge:true});
+    const ref = dbf.doc("plans/"+PLA_ID+"/privat/seguiment");
+    /* Abans d'enviar, incorporem les marques privades que ja hi hagi al
+       servidor. Aixi una migracio iniciada abans que arribi onSnapshot
+       no pot esborrar el que un altre aparell ja havia migrat. */
+    await dbf.runTransaction(async tx=>{
+      const d = await tx.get(ref);
+      let revRemota = 0;
+      if(d.exists){
+        const r = d.data()||{};
+        revRemota = r.rev||0;
+        if(r.supervisio) fusionarSupervisio(r.supervisio);
+      }
+      S.privatRev = Math.max(revRemota,S.privatRev||0)+1;
+      tx.set(ref,{
+        canvis:(S.canvis||[]).slice(0,300),
+        missatges:(S.missatges||[]).slice(0,300),
+        pesos:S.pesos||{}, diari:S.diari||{},
+        documents:(S.documents||[]).slice(0,200),
+        target:S.target||null, targetHist:S.targetHist||[],
+        supervisio:S.supervisio||{},
+        rev:S.privatRev,
+        actualitzat: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true});
+    });
   }
 
   function programar(){
@@ -502,7 +619,11 @@ const Sync = (() => {
     const llista = [...pendents]; pendents.clear();
     try{
       for(const k of llista){
-        if(k==="__config__"){
+        if(k==="__esborrats__"){
+          await processarEsborrats();
+        } else if(k==="__privat__"){
+          await enviarPrivat();
+        } else if(k==="__config__"){
           /* La revisio es demana al servidor, no es calcula aqui.
              Calculant-la en local, dos aparells que editessin alhora
              escrivien la mateixa revisio: l'ultim guanyava i l'altre
@@ -533,10 +654,19 @@ const Sync = (() => {
           const setmana = S.weeks[weekKey(parseDay(ds))];
           const day = setmana && setmana[ds];
           if(!day) continue;
-          await dbf.doc("plans/"+PLA_ID+"/setmanes/"+weekKey(parseDay(ds))).set({
-            dies: {[ds]: day},
-            actualitzat: firebase.firestore.FieldValue.serverTimestamp()
-          }, {merge:true});
+          const ref = dbf.doc("plans/"+PLA_ID+"/setmanes/"+weekKey(parseDay(ds)));
+          const ara = firebase.firestore.FieldValue.serverTimestamp();
+          try{
+            /* Reemplaça el mapa del dia sencer. Amb set({merge:true}),
+               supervisio podia sobreviure al servidor tot i no ser ja a
+               l'objecte local, perque Firestore fusiona els mapes. */
+            await ref.update(new firebase.firestore.FieldPath("dies",ds), day,
+                             "actualitzat", ara);
+          }catch(e){
+            if(e && (e.code==="not-found" || e.code==="not_found"))
+              await ref.set({dies:{[ds]:day},actualitzat:ara},{merge:true});
+            else throw e;
+          }
         }
       }
       intentsFallits = 0;
@@ -577,6 +707,28 @@ const Sync = (() => {
      respecta de sobres. */
   const refFoto = (ds, meal) => dbf.doc("plans/"+PLA_ID+"/fotos/"+ds+"_"+meal);
 
+  /* Cua persistent d'esborrats remots. Les eliminacions son idempotents:
+     si el proces es talla despres d'esborrar a Firebase pero abans de
+     retirar la cua, repetir delete() es segur. */
+  async function processarEsborrats(){
+    if(est.estat!=="connectat") throw new Error("sense connexio");
+    S.cuaFotosEsborrades = S.cuaFotosEsborrades || {};
+    for(const [k,x] of Object.entries(S.cuaFotosEsborrades)){
+      await refFoto(x.ds,x.meal).delete();
+      delete S.cuaFotosEsborrades[k];
+      desarLocal();
+    }
+    if(NOMES_GUIA) return;
+    S.cuaDocumentsEsborrats = S.cuaDocumentsEsborrats || {};
+    for(const [id,x] of Object.entries(S.cuaDocumentsEsborrats)){
+      for(let i=0;i<(x.parts||0);i++)
+        await dbf.doc("plans/"+PLA_ID+"/documents/"+id+"_c"+i).delete();
+      await dbf.doc("plans/"+PLA_ID+"/documents/"+id).delete();
+      delete S.cuaDocumentsEsborrats[id];
+      desarLocal();
+    }
+  }
+
   /* Retorna true nomes si el servidor ho ha confirmat. Si no hi ha sessio
      llenca error en lloc de retornar null: qui crida marcava la foto com
      a enviada sense mirar el retorn, i llavors ja no entrava mai a la cua
@@ -603,10 +755,12 @@ const Sync = (() => {
     }catch(e){ console.warn("baixarFoto:", e); return null; }
   }
   async function esborrarFoto(ds, meal){
+    S.cuaFotosEsborrades = S.cuaFotosEsborrades || {};
+    S.cuaFotosEsborrades[ds+"_"+meal] = {ds,meal};
+    desarLocal();
     await Fotos.esborrar(ds, meal);
-    if(est.estat==="connectat"){
-      try{ await refFoto(ds, meal).delete(); }catch(e){ console.warn("esborrarFoto:", e); }
-    }
+    pendents.add("__esborrats__");
+    programar();
   }
 
   /* --- documents adjunts als missatges ---
@@ -650,12 +804,13 @@ const Sync = (() => {
     }catch(e){ console.warn("baixarDocument:", e); return null; }
   }
   async function esborrarDocument(fitxa){
-    if(est.estat!=="connectat") return;
-    try{
-      for(let i=0;i<fitxa.parts;i++)
-        await dbf.doc("plans/"+PLA_ID+"/documents/"+fitxa.id+"_c"+i).delete();
-      await dbf.doc("plans/"+PLA_ID+"/documents/"+fitxa.id).delete();
-    }catch(e){ console.warn("esborrarDocument:", e); }
+    if(!fitxa || !fitxa.id) return;
+    S.cuaDocumentsEsborrats = S.cuaDocumentsEsborrats || {};
+    S.cuaDocumentsEsborrats[fitxa.id] = {parts:Number(fitxa.parts)||0};
+    desarLocal();
+    await Fotos.esborrarBlob("doc_"+fitxa.id);
+    pendents.add("__esborrats__");
+    programar();
   }
 
   /* Espai ocupat. Es calcula amb les mides que cada dia ja porta desades,
@@ -665,7 +820,8 @@ const Sync = (() => {
     for(const setmana of Object.values(S.weeks||{}))
       for(const dia of Object.values(setmana))
         for(const f of Object.values(dia.fotos||{})){
-          n++; bytes += (f && f.mida) ? f.mida : 180*1024;   // estimació si no consta
+          const mida = (f&&f.mida) ? f.mida : 180*1024;
+          n++; bytes += midaBase64(mida)+1024; // text codificat + metadades aproximades
         }
     const LIMIT = 1024*1024*1024;            // 1 GB del pla gratuït
     return {n, bytes, limit:LIMIT, percentatge: bytes/LIMIT*100};
@@ -676,7 +832,9 @@ const Sync = (() => {
      el total: un compte per separat enganyaria. */
   function espaiDocs(){
     let n = 0, bytes = 0;
-    for(const d of (S.documents||[])){ n++; bytes += d.mida || 0; }
+    for(const d of documentsVius()){
+      n++; bytes += midaBase64(d.mida||0)+1024*((d.parts||0)+1);
+    }
     const LIMIT = 1024*1024*1024;
     return {n, bytes, limit:LIMIT, percentatge: bytes/LIMIT*100};
   }
@@ -687,7 +845,7 @@ const Sync = (() => {
             percentatge: bytes/LIMIT*100};
   }
 
-  return {est, init, login, logout, push, pushDia, pushSetmana, pushConfig, marcar,
+  return {est, init, login, logout, push, pushDia, pushPrivat, pushSetmana, pushConfig, marcar,
           pujarFoto, baixarFoto, esborrarFoto, espaiFotos, espaiDocs, espaiTotal, configurat,
           pujarDocument, baixarDocument, esborrarDocument};
 })();
@@ -705,7 +863,13 @@ function tocarDia(ds){
      tornava a enviar la seva copia de tots els altres dies. */
   if(typeof Sync!=="undefined") Sync.pushDia(ds);
 }
+function tocarSupervisio(){
+  saveState(true);
+  if(typeof Sync!=="undefined") Sync.pushPrivat();
+}
 function tocarConfig(){
   saveState(true);
   if(typeof Sync!=="undefined") Sync.pushConfig();
 }
+
+if(typeof module!=="undefined") module.exports = {Fotos,midaBase64};
