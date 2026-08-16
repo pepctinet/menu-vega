@@ -443,7 +443,16 @@ function weekKey(d){
   return y+"-W"+pad(n);
 }
 const fmtDay  = d => d.getDate()+" "+MESOS3[d.getMonth()];
-const fmtLong = d => DIES[(d.getDay()+6)%7]+", "+d.getDate()+" de "+MESOS[d.getMonth()];
+
+/* «16 d'agost», no «16 de agost». La preposició s'apostrofa davant de
+   vocal, i dels dotze mesos només n'hi ha tres que hi comencin: abril,
+   agost i octubre. Cap mes català no comença per hac, o sigui que amb
+   la vocal n'hi ha prou. */
+function deMes(i){
+  const m = MESOS[i];
+  return (/^[aeiouàèéíòóú]/i.test(m) ? "d'" : "de ") + m;
+}
+const fmtLong = d => DIES[(d.getDay()+6)%7]+", "+d.getDate()+" "+deMes(d.getMonth());
 const parseDay = ds => new Date(ds+"T00:00:00");
 
 /* El dia d'avui, calculat CADA VEGADA que es demana.
@@ -1869,7 +1878,7 @@ if (typeof module !== "undefined") module.exports = {
   weekKey, dayData, weekData, structure, checkMeal, checkDay, dayItems,
   proposarSetmana, expandir, compraDe, agruparCompra, qtyTxt, shopRound,
   unitatTxt, nomUnitat, MIDES, plural, esc, escJs,
-  qtyRef, fruitPieces, postresAlternades, esValidat, fmtDay, fmtLong,
+  qtyRef, fruitPieces, postresAlternades, esValidat, fmtDay, fmtLong, deMes,
   avui, propersMitjanit, vigilarCanviDeDia, get TODAY(){ return avui(); },
   parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
