@@ -363,7 +363,21 @@ function loadState(){
     }catch(e){}
   }
   if(!s) s = {};
-  if(NOMES_GUIA) nomesGuia(s);
+  if(NOMES_GUIA){
+    /* Netejar la memoria no es prou. El que ja hi ha escrit al magatzem
+       del telefon s'hi queda fins que alguna cosa provoqui un desament,
+       i un aparell que hagi corregut una versio anterior encara hi te el
+       que aquella versio no sabia treure: les marques de supervisio
+       dins dels dies, per exemple. Mesurat en un aparell de proves: 14
+       dies amb la marca al disc amb la memoria ja neta.
+
+       Si la neteja ha canviat res, ho desem ARA i no esperem. */
+    const abansDeNetejar = JSON.stringify(s);
+    nomesGuia(s);
+    if(JSON.stringify(s) !== abansDeNetejar){
+      try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){}
+    }
+  }
   else extreureSupervisioDies(s, true);
   s.weeks    = s.weeks    || {};   // {setmana: {data: {meals,postres,habits,validat,fotos}}}
   s.custom   = s.custom   || [];   // plats creats de nou
