@@ -58,8 +58,8 @@ header .data{font-size:13px;opacity:.88;margin-top:2px;text-transform:capitalize
 /* ---------- resum del dia ---------- */
 .dia{margin:14px 16px 0;background:var(--paper);border:1px solid var(--linia);
  border-radius:16px;padding:13px 15px}
-.dia .eq{display:inline-flex;align-items:center;gap:6px;background:var(--verd-clar);
- color:var(--verd-fosc);border-radius:99px;padding:5px 13px;font-size:13.5px;font-weight:700}
+/* La classe .eq (el distintiu verd d'"Equilibrat" del dia) s'ha retirat
+   el 17 d'agost amb el resum del dia. No es torna a posar. */
 .dia .neutre{font-size:13.5px;color:var(--gris)}
 .habits{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
 .hb{border:1px solid var(--linia);border-radius:99px;padding:6px 12px;font-size:12.5px;
@@ -86,8 +86,8 @@ main{padding:14px 16px 0}
 .plegat-cap .fl{color:var(--gris);font-size:13px;flex:none;transition:transform .18s}
 .plegat-cap .mini{display:flex;gap:5px;align-items:center;flex:none}
 .pt{width:8px;height:8px;border-radius:99px;flex:none}
-.pt.ok{background:var(--verd)}
-.pt.falta{background:#e8bd4a}
+/* .pt.ok i .pt.falta (el punt verd i el groc dels àpats plegats) s'han
+   retirat el 17 d'agost: eren un semàfor sobre un àpat ja posat. */
 .pt.fora{background:#8fa3b5}
 .plat{font-size:17.5px;font-weight:700;line-height:1.3}
 .plat.buit{color:#b6b3a8;font-weight:500;font-style:italic;font-size:15px}
@@ -294,7 +294,6 @@ function pintar(){
   const ara = apatActual();
   if(araAnterior !== null && araAnterior !== ara) desplegats.clear();
   araAnterior = ara;
-  const chk = checkDay(day);
 
   document.getElementById("data").textContent = fmtLong(dt);
 
@@ -302,10 +301,12 @@ function pintar(){
   if(esValidat(day))
     h += `<div class="validat">${IC.check} Dia tancat</div>`;
 
-  /* Resum del dia: "Equilibrat" si ho està. Si no, res de res. */
-  h += `<div class="dia">`;
-  if(chk.complet) h += `<span class="eq">${IC.check} Equilibrat</span>`;
-  else h += `<div class="neutre">El dia d'avui</div>`;
+  /* El dia no es valora a la seva pantalla, ni bé ni malament. Abans hi
+     deia "Equilibrat" quan complia i callava quan no; ara no ho diu mai.
+     La valoració d'un àpat només la veu mentre el munta, que és quan li
+     serveix per decidir què hi posa. Un cop l'àpat està posat, la marca
+     desapareix. Decisió d'ell, 17 d'agost. */
+  h += `<div class="dia"><div class="neutre">El dia d'avui</div>`;
   h += pintarHabits(day) + `</div>`;
 
   h += `<main>`;
@@ -322,10 +323,11 @@ function pintar(){
     const desplegat = (ara===m.id) || obertManual;
 
     if(!desplegat){
-      /* checkItems, no faltaApat: faltaApat només sap mirar el dinar i el
-         sopar i deia que un esmorzar buit estava complet. */
-      const est = !a ? "" : a.tipus==="fora" ? "fora"
-                : (checkItems(a.i, m.id, momentDe(day)).complet ? "ok" : "falta");
+      /* Cap punt de color que valori l'àpat. El verd i el groc eren una
+         nota sobre un àpat que ja estava posat, i a més eren un semàfor.
+         Es manté el punt de "fora de casa", que diu on menja, no si ho
+         ha fet bé. */
+      const est = (a && a.tipus==="fora") ? "fora" : "";
       h += `<div class="meal plegat" id="meal-${m.id}">
         <div class="mh">
           <span class="hora">${m.h}</span>
@@ -358,17 +360,11 @@ function pintar(){
         <span class="marca fora">${esc(a.lloc||"Fora")}</span>
         <div class="foratxt">${esc(a.n)}</div>`;
     } else {
-      /* Una sola API per a tots cinc àpats. Abans els àpats petits es
-         miraven amb faltaApat (que no els sap mirar) o amb checkMeal
-         (que necessita un plat del catàleg, i per tant no valorava mai
-         un àpat que s'hagués construït ella). */
-      const f = checkItems(a.i, m.id, momentDe(day));
+      /* Un àpat ja posat no es valora: ni "Equilibrat" ni "Hi falta".
+         Això només es veu a la pantalla de muntar l'àpat, mentre ella hi
+         va afegint coses i li serveix per triar. Un cop l'àpat és al
+         dia, el que veu és què hi ha i en quines quantitats. */
       h += `<div class="plat">${esc(a.n)}</div>`;
-      if(f.complet){
-        h += `<span class="marca ok">${IC.check} Equilibrat</span>`;
-      } else if(m.id==="dinar"||m.id==="sopar"){
-        h += `<span class="marca falta">Hi falta ${esc(f.falten.join(" i "))}</span>`;
-      }
       h += `<div class="ings">`+Object.entries(a.i).map(([k,g])=>{
         const x = ing(k); if(!x) return "";
         return `<div><span>${esc(x.n)}${x.nota?` <span class="sub">(${esc(x.nota)})</span>`:""}</span>

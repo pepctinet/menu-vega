@@ -1,6 +1,6 @@
 /* Capa fora de línia. Només conserva fitxers estàtics del mateix origen:
    les dades personals continuen a localStorage/IndexedDB i a Firebase. */
-const NOM_CACHE = "menu-vega-estatics-2026-08-16k";
+const NOM_CACHE = "menu-vega-estatics-2026-08-17a";
 const PREFIX_CACHE = "menu-vega-estatics-";
 /* NOMES el que necessita CADA aparell per arrencar sense connexio, i
    res mes. Aqui hi havia index.html, pes.html i nutri.js: com que els
