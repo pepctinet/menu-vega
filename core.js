@@ -1051,6 +1051,37 @@ function postresAlternades(day){
    8. PROPOSTA AUTOMÀTICA DE SETMANA
    --------------------------------------------------------------------- */
 
+/* El plat que hi ha a l'altra banda de la nit: per al dinar, el sopar del
+   dia abans; per al sopar, el dinar de l'endemà.
+
+   ajustarDia() ja mirava que el dinar i el sopar d'un mateix dia no fossin
+   el mateix plat, i la cadena filtrava els candidats amb l'altre àpat del
+   mateix dia. Però la frontera de la nit no la mirava ningú, i tant el
+   generador com la cadena hi deixaven el mateix plat dues vegades seguides:
+   gaspatxo amb hummus per sopar i, l'endemà, gaspatxo amb hummus per dinar.
+
+   Tres coses a tenir en compte:
+     · llegeix sense crear res. dayData() crearia el dia buit i l'enviaria
+       al servidor, i aquí només el volem consultar.
+     · si el veí és un àpat que ella ha adaptat o ha fet fora, no hi ha cap
+       plat del catàleg a repetir: retorna null.
+     · només val per a dinar i sopar. Als àpats petits no s'hi aplica. */
+function platAltraBanda(ds, mealId){
+  if(mealId !== "dinar" && mealId !== "sopar") return null;
+  const veiId = mealId === "dinar" ? "sopar" : "dinar";
+  const dt = addDays(parseDay(ds), mealId === "dinar" ? -1 : 1);
+  const setmana = S.weeks[weekKey(dt)];
+  const dia = setmana && setmana[iso(dt)];
+  if(!dia || !dia.meals) return null;
+  if((dia.custom && dia.custom[veiId]) || (dia.fora && dia.fora[veiId])) return null;
+  return dia.meals[veiId] || null;
+}
+
+/* Els dos veïns de nit d'un dia, en el format que espera ajustarDia(). */
+function veinsDeNit(ds){
+  return {dinar: platAltraBanda(ds,"dinar"), sopar: platAltraBanda(ds,"sopar")};
+}
+
 /* Candidats per a un àpat: els plats que l'admeten, i d'aquests els que
    surten equilibrats si n'hi ha cap. Si no n'hi ha cap d'equilibrat val
    més oferir-los tots que no pas quedar-nos sense candidats. */
@@ -1082,9 +1113,28 @@ function proposarSetmana(mon, opcions){
       if(day.meals[mid] || bloquejat(mid)) continue;
       const p = P[mid]; if(p.length){ day.meals[mid] = p[i % p.length].id; canvis++; }
     }
+    /* Els plats de l'altra banda de la nit. El del dinar (el sopar d'ahir)
+       hi és sempre que el dia d'abans estigui programat, i per això aquest
+       filtre també tanca la frontera entre dues setmanes. El del sopar
+       normalment és null, perquè l'endemà encara no s'ha generat; només
+       compta quan es torna a generar una setmana ja feta. */
+    const vei = veinsDeNit(iso(dt));
+    /* Tria el plat que toca per rotació i, si resulta ser justament el de
+       l'altra banda de la nit, avança al següent de la llista.
+
+       Podria semblar més net treure'l dels candidats amb un filter(), però
+       fer-ho surt car: la llista s'escurça, l'índex (i*3)%p.length cau en
+       un altre lloc i tota la rotació de la setmana es desplaça. Mesurat:
+       filtrant, la setmana passava d'11 plats diferents a 7 i els sopars
+       de 6 a 3. Saltant només quan hi ha topada, la rotació es queda on
+       era i la setmana no perd res. */
     if(!day.meals.dinar && !bloquejat("dinar")){
       const p = P.dinar.filter(d=>!usats.has(d.id));
-      if(p.length){ const d=p[(i*3)%p.length]; day.meals.dinar=d.id; usats.add(d.id); canvis++; }
+      if(p.length){
+        let j = (i*3)%p.length;
+        for(let n=0; n<p.length && p[j].id===vei.dinar; n++) j=(j+1)%p.length;
+        if(p[j].id !== vei.dinar){ day.meals.dinar=p[j].id; usats.add(p[j].id); canvis++; }
+      }
     }
     if(!day.meals.sopar && !bloquejat("sopar")){
       const dDinar = dishById(day.meals.dinar);
@@ -1092,13 +1142,17 @@ function proposarSetmana(mon, opcions){
       let p = P.sopar.filter(d=>!usats.has(d.id));
       const pref = p.filter(d=>teCrua(d)===volCrua);
       if(pref.length) p = pref;
-      if(p.length){ day.meals.sopar = p[(i*5+2)%p.length].id; canvis++; }
+      if(p.length){
+        let j = (i*5+2)%p.length;
+        for(let n=0; n<p.length && p[j].id===vei.sopar; n++) j=(j+1)%p.length;
+        if(p[j].id !== vei.sopar){ day.meals.sopar = p[j].id; canvis++; }
+      }
     }
     /* Fins aquí hem triat àpats bons per separat. Ara comprovem el dia
        sencer: pot passar que dinar i sopar siguin tots dos de verdura
        cuita i el dia es quedi sense verdura crua, i llavors surt en
        taronja tot i tenir els cinc àpats en verd. */
-    ajustarDia(day, i, P, bloquejat);
+    ajustarDia(day, i, P, bloquejat, vei);
     if(!day.postres.dinar) day.postres.dinar = i%2===0 ? "p_iogurt" : fruites[i%fruites.length];
     if(!day.postres.sopar) day.postres.sopar = i%2===0 ? fruites[i%fruites.length] : "p_iogurt";
   }
@@ -1108,12 +1162,19 @@ function proposarSetmana(mon, opcions){
 /* Repassa un dia ja assignat i el corregeix si no acaba de quadrar.
    Dues coses: que hi hagi verdura crua i cuita, i que el dinar i el
    sopar no siguin mai el mateix plat. */
-function ajustarDia(day, i, P, bloquejat){
+/* 'evitar' és opcional i porta {dinar, sopar} amb el plat que hi ha a
+   l'altra banda de la nit (veinsDeNit()). Sense aquest paràmetre la funció
+   es comporta com sempre, o sigui que qui la cridi sense ell no es trenca;
+   però llavors pot tornar a posar al sopar el plat que l'endemà surt per
+   dinar, que és justament el que arreglem. */
+function ajustarDia(day, i, P, bloquejat, evitar){
   const lliure = mid => !bloquejat(mid) && !esValidat(day);
+  const ev = evitar || {};
+  const deNit = (mid, id) => !!ev[mid] && id === ev[mid];
 
   /* 1. dinar i sopar mai el mateix */
   if(day.meals.dinar && day.meals.dinar === day.meals.sopar && lliure("sopar")){
-    const alt = P.sopar.filter(d => d.id !== day.meals.dinar);
+    const alt = P.sopar.filter(d => d.id !== day.meals.dinar && !deNit("sopar", d.id));
     if(alt.length) day.meals.sopar = alt[i % alt.length].id;
   }
 
@@ -1126,7 +1187,8 @@ function ajustarDia(day, i, P, bloquejat){
     const altre = mid === "sopar" ? day.meals.dinar : day.meals.sopar;
     const abans = day.meals[mid];
     const cand = P[mid].filter(d =>
-      d.id !== abans && d.id !== altre && structure(d.i).g.verd_c >= 100);
+      d.id !== abans && d.id !== altre && !deNit(mid, d.id) &&
+      structure(d.i).g.verd_c >= 100);
     if(!cand.length) continue;
     day.meals[mid] = cand[i % cand.length].id;
     if(cruaDelDia() >= 100) return;
@@ -1149,6 +1211,15 @@ function ajustarDia(day, i, P, bloquejat){
      6. l'avís i el desfer viuen a day.auto
      7. el substitut passa també per ajustarDia()
      8. si no hi ha substitut que compleixi tot, l'àpat es queda com era
+
+   I una de nova, del 17 d'agost (decisió d'ell):
+     9. el sopar d'un dia i el dinar de l'endemà no poden ser el mateix
+        plat. Fins ara la comparació de plats es feia només dins d'un
+        mateix dia, i la cadena podia posar gaspatxo amb hummus al sopar
+        sense veure que l'endemà ja n'hi havia per dinar. Ho tanca
+        platAltraBanda(). És només el plat: repetir la proteïna o l'hidrat
+        d'un àpat a l'altre continua permès, que això només ho mira la
+        regla 2 i només contra l'àpat d'origen.
 
    Un àpat fet fora no dispara res: no en sabem les quantitats, i
    apatDelDia() ja el torna amb i:{} i valorable:false.
@@ -1252,8 +1323,14 @@ function reprogramarCadena(ds, mealId, opcions){
       const abans = Object.assign({}, day.meals);
       if(!originals.has(t.ds)) originals.set(t.ds, Object.assign({}, day.meals));
       const altre = t.mealId==="dinar" ? day.meals.sopar : day.meals.dinar;
+      /* El plat de l'altra banda de la nit. Es calcula aquí dins del bucle,
+         i no abans, a propòsit: quan la cadena arriba al dinar de demà, el
+         sopar d'avui ja el pot haver canviat ella mateixa a la volta
+         anterior, i el que s'ha d'evitar és el plat que hi ha ara, no el
+         que hi havia quan la cadena ha començat. */
+      const vei = platAltraBanda(t.ds, t.mealId);
       const cand = P[t.mealId].filter(d =>
-        d.id !== actual && d.id !== altre &&
+        d.id !== actual && d.id !== altre && d.id !== vei &&
         !nutrientsClau(d.i).some(k => bloc.has(k)));
       if(!cand.length) continue;                      // condició 8
 
@@ -1270,9 +1347,10 @@ function reprogramarCadena(ds, mealId, opcions){
       let servit = false;
       for(let k=0; k<cand.length && !servit; k++){
         day.meals[t.mealId] = cand[(i+k) % cand.length].id;
-        ajustarDia(day, i, P, bloquejat);             // condició 7
+        ajustarDia(day, i, P, bloquejat, veinsDeNit(t.ds));   // condició 7
         const final = dishById(day.meals[t.mealId]);
-        if(final && !nutrientsClau(final.i).some(x => bloc.has(x))) servit = true;
+        if(final && final.id !== vei &&
+           !nutrientsClau(final.i).some(x => bloc.has(x))) servit = true;
         else day.meals = Object.assign({}, abans);    // no ha anat: el següent
       }
       if(!servit) continue;                           // condició 8
@@ -2069,6 +2147,7 @@ if (typeof module !== "undefined") module.exports = {
   avui, propersMitjanit, vigilarCanviDeDia, get TODAY(){ return avui(); },
   parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
+  platAltraBanda, veinsDeNit,
   desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,
   RACIONS_BASE, apuntarRacions, racionsVigents, momentDe, MOMENT_ARA,
   apuntarApatsFixos, apatsFixosVigents, retallarHist, MAX_HIST,
