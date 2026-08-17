@@ -291,11 +291,11 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<script src="firebase-config.js?v=2026-08-17c"></script>
-<script src="core.js?v=2026-08-17c"></script>
-<script src="nutri.js?v=2026-08-17c"></script>
-<script src="sync.js?v=2026-08-17c"></script>
-<script src="registre-sw.js?v=2026-08-17c"></script>
+<script src="firebase-config.js?v=2026-08-17d"></script>
+<script src="core.js?v=2026-08-17d"></script>
+<script src="nutri.js?v=2026-08-17d"></script>
+<script src="sync.js?v=2026-08-17d"></script>
+<script src="registre-sw.js?v=2026-08-17d"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -2724,25 +2724,59 @@ function treureUnitat(k){
   tocarConfig(); closeModal(); render();
 }
 
-/* Les receptes fixes dels àpats petits */
+/* Les receptes fixes dels àpats petits.
+
+   Fins al 17 d'agost aquesta pantalla només ensenyava els criteris de 'cal'
+   i de 'min': els tres de 'alguna' del berenar no sortien enlloc, i la
+   proteïna i el greix de l'esmorzar ni tan sols eren criteris editables,
+   estaven escrits dins de checkItems(). De dotze criteris, se'n podien
+   tocar set. Ara hi són tots dotze. */
+
+/* El nom d'un grup tal com surt a la Guia. Ve de CATS, que és on viuen els
+   noms de debò; el número de davant ("1 · Proteïna") aquí fa nosa. */
+function nomGrupGuia(k){
+  const c = CATS.find(x=>x.k===k);
+  return c ? c.t.replace(/^\d+[a-z]?\s*·\s*/,"") : k;
+}
+function filaCriteri(id, nom, valor, unitat, extra){
+  return `<div class="qrow"><span class="nm">${esc(nom)}
+    ${extra?`<div class="xs muted">${esc(extra)}</div>`:""}</span>
+    <input type="number" id="${id}" value="${valor}" min="0" step="5"><span class="un">${unitat}</span></div>`;
+}
 function editarApatFix(mealId){
   const F = apatsFixos()[mealId]; if(!F) return;
   const m = MEALS.find(x=>x.id===mealId);
   let cos = `<div class="xs muted" style="margin-bottom:4px">Indicació</div>
     <input class="search" id="af_ajuda" value="${esc(F.ajuda||"")}">`;
-  const files = [];
-  for(const [k,q] of Object.entries(F.cal||{}))
-    files.push([`af_cal_${k}`, (ing(k)?ing(k).n:k)+" — sempre", q,
-                ing(k)&&ing(k).ml?"ml":"g", unitatTxt(k,q)]);
-  for(const [c,q] of Object.entries(F.min||{}))
-    files.push([`af_min_${c}`, c==="fruita"?"Fruita, com a mínim":"Hidrats, com a mínim",
-                q, "g", ""]);
-  cos += files.map(([id,nom,v,u,eq])=>`<div class="qrow"><span class="nm">${esc(nom)}
-    ${eq?`<div class="xs muted">que són ${esc(eq)}</div>`:""}</span>
-    <input type="number" id="${id}" value="${v}" min="0" step="5"><span class="un">${u}</span></div>`).join("");
+
+  const cal = Object.entries(F.cal||{});
+  if(cal.length){
+    cos += `<div class="xs muted" style="margin-top:14px">Hi ha de ser sempre</div>` +
+      cal.map(([k,q]) => filaCriteri(`af_cal_${k}`, ing(k)?ing(k).n:k, q,
+        ing(k)&&ing(k).ml?"ml":"g", unitatTxt(k,q)?"que són "+unitatTxt(k,q):"")).join("");
+  }
+
+  const min = Object.entries(F.min||{});
+  if(min.length){
+    cos += `<div class="xs muted" style="margin-top:14px">Com a mínim</div>` +
+      min.map(([k,q]) => filaCriteri(`af_min_${k}`, nomGrupGuia(k), q, "g", "")).join("");
+  }
+
+  /* «Almenys un d'aquests». No és una llista de coses que hi hagin de ser
+     totes: amb una que arribi al seu número, el criteri es compleix. Es diu
+     a la pantalla perquè llegint només els números sembla el contrari. */
+  const alg = Object.entries(F.alguna||{});
+  if(alg.length){
+    cos += `<div class="xs muted" style="margin-top:14px">
+      Almenys un d'aquests <span style="opacity:.8">— amb un que hi sigui, ja compleix</span></div>` +
+      alg.map(([k,q]) => filaCriteri(`af_alg_${k}`,
+        esGrup(k) ? nomGrupGuia(k) : (ing(k)?ing(k).n:k), q,
+        !esGrup(k) && ing(k) && ing(k).ml ? "ml" : "g", "")).join("");
+  }
+
   openModal(`<div class="mhead"><div><h3>${esc(m.n)}</h3>
     <div class="small muted">Aquests números són els que fa servir l'aplicatiu per dir
-      si l'àpat està complet</div></div>
+      si l'àpat està complet. <b>Un criteri a zero és un criteri retirat.</b></div></div>
     <button class="close" onclick="closeModal()">×</button></div>
     <div class="mbody">${cos}
       <button class="btn" style="margin-top:12px" onclick="desarApatFix('${escJs(mealId)}')">Desar</button>
@@ -2750,10 +2784,22 @@ function editarApatFix(mealId){
 }
 function desarApatFix(mealId){
   const F = apatsFixos()[mealId];
-  const c = {cal:{}, min:{}};
-  for(const k of Object.keys(F.cal||{})){ const el=$("#af_cal_"+k); if(el) c.cal[k]=+el.value||0; }
-  for(const k of Object.keys(F.min||{})){ const el=$("#af_min_"+k); if(el) c.min[k]=+el.value||0; }
+  const c = {cal:{}, min:{}, alguna:{}};
+  for(const k of Object.keys(F.cal||{}))   { const el=$("#af_cal_"+k); if(el) c.cal[k]   =+el.value||0; }
+  for(const k of Object.keys(F.min||{}))   { const el=$("#af_min_"+k); if(el) c.min[k]   =+el.value||0; }
+  for(const k of Object.keys(F.alguna||{})){ const el=$("#af_alg_"+k); if(el) c.alguna[k]=+el.value||0; }
   const aj = $("#af_ajuda"); if(aj) c.ajuda = aj.value.trim();
+
+  /* Un àpat sense cap criteri sortiria sempre complet i no voldria dir res.
+     Val més negar-s'hi que deixar-lo mut sense avisar. */
+  const vius = [c.cal, c.min, c.alguna]
+    .reduce((n,o) => n + Object.values(o).filter(q=>q>0).length, 0);
+  if(!vius){
+    alert("Aquest àpat es quedaria sense cap criteri i sortiria sempre complet.\n\n" +
+          "Deixa'n almenys un per sobre de zero.");
+    return;
+  }
+
   S.apatsFixos = S.apatsFixos || {};
   S.apatsFixos[mealId] = c;
   apuntarCanvi("Ha canviat les quantitats de l'àpat «"+
@@ -2880,8 +2926,16 @@ function viewGuia(){
       const F = apatsFixos()[m.id];
       return `<tr><td class="qty" style="width:70px">${esc(m.h)}</td><td><b>${esc(m.n)}</b>
         ${F?`<div class="xs muted">${esc(F.ajuda||"")}</div>
-          ${Object.keys(F.cal||{}).length?`<div class="xs">Sempre: ${
-            Object.entries(F.cal).map(([k,q])=>esc((ing(k)?ing(k).n:k)+" "+qtyTxt(k,q))).join(" · ")}</div>`:""}
+          ${Object.entries(F.cal||{}).filter(([,q])=>q>0).length?`<div class="xs">Sempre: ${
+            Object.entries(F.cal).filter(([,q])=>q>0)
+              .map(([k,q])=>esc((ing(k)?ing(k).n:k)+" "+qtyTxt(k,q))).join(" · ")}</div>`:""}
+          ${Object.entries(F.min||{}).filter(([,q])=>q>0).length?`<div class="xs">Com a mínim: ${
+            Object.entries(F.min).filter(([,q])=>q>0)
+              .map(([k,q])=>esc(nomGrupGuia(k).toLowerCase()+" "+q+" g")).join(" · ")}</div>`:""}
+          ${Object.entries(F.alguna||{}).filter(([,q])=>q>0).length?`<div class="xs">Almenys un: ${
+            Object.entries(F.alguna).filter(([,q])=>q>0)
+              .map(([k,q])=>esc((esGrup(k)?nomGrupGuia(k).toLowerCase():(ing(k)?ing(k).n:k))+" "+q+" g"))
+              .join(" · ")}</div>`:""}
           <button class="btn ghost sm no-print" style="margin-top:5px"
             onclick="editarApatFix('${escJs(m.id)}')">Canviar les quantitats</button>`
         :`<div class="xs muted">Es mesura per racions (a sota)</div>`}</td></tr>`;

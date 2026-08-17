@@ -958,6 +958,36 @@ function checkMeal(dishId, mealId, quan){
   if(!d) return {complet:false, falten:[], buit:true};
   return checkItems(d.i, mealId, quan);
 }
+/* Un criteri dels àpats petits apunta o bé a un GRUP (la proteïna, el
+   greix) o bé a un INGREDIENT concret (les boletes, el pa). Es distingeixen
+   per la clau: si és un dels grups de structure(), és un grup. */
+const GRUPS_CRITERI = ["prot","hc","verd_c","verd_k","verd","greix","fruita","cond"];
+const esGrup = k => GRUPS_CRITERI.includes(k);
+
+/* Com es diu cada criteri quan falta. Es redacta en positiu, com la resta
+   dels «falten»: és el que hi pot afegir, no una nota del que ha fet
+   malament. Aquests textos abans estaven escampats per checkItems(). */
+const NOM_GRUP = {
+  prot:  "un aliment amb proteïna",
+  hc:    "el pa o els flocs de civada",
+  verd_c:"verdura crua",
+  verd_k:"verdura cuinada",
+  verd:  "verdura",
+  greix: "un greix saludable",
+  fruita:"la fruita",
+  cond:  "condiments",
+};
+const textMin = cat => NOM_GRUP[cat] || ("més "+cat);
+function nomCriteri(k){
+  if(esGrup(k)) return NOM_GRUP[k] || k;
+  const x = ing(k);
+  return x ? x.n.toLowerCase() : k;
+}
+function textAlguna(ks){
+  const n = ks.map(nomCriteri);
+  return n.length <= 1 ? (n[0]||"") : n.slice(0,-1).join(", ")+" o "+n[n.length-1];
+}
+
 function checkItems(items, mealId, quan){
   if(mealId==="dinar" || mealId==="sopar"){
     const r = faltaApat(items, mealId, quan);
@@ -976,21 +1006,19 @@ function checkItems(items, mealId, quan){
        Amb el moment: un canvi fet avui no pot canviar la valoració d'un
        esmorzar que ella ja s'ha menjat. */
     const F = apatsFixos(QUAN(quan))[mealId] || {min:{}, cal:{}};
+    /* Un criteri a zero és un criteri retirat, aquí i a min i a alguna. */
     for(const [k,q] of Object.entries(F.cal||{}))
-      if((d.i[k]||0) < q)
+      if(q > 0 && (d.i[k]||0) < q)
         f.push((ing(k)?ing(k).n.toLowerCase():k)+" ("+q+(ing(k)&&ing(k).ml?" ml":" g")+")");
     for(const [cat,q] of Object.entries(F.min||{}))
-      if((s.g[cat]||0) < q)
-        f.push(cat==="fruita" ? "la fruita"
-             : cat==="hc"     ? "el pa o els flocs de civada" : "més "+cat);
-    if(F.alguna && Object.keys(F.alguna).length){
-      const teCap = Object.entries(F.alguna).some(([k,q]) =>
-        (k==="greix" ? (s.g.greix||0) : (d.i[k]||0)) >= q);
-      if(!teCap) f.push("les boletes, l'entrepà o el grapat de fruits secs");
-    }
-    if(mealId==="esmorzar"){
-      if(!s.g.prot)         f.push("un aliment amb proteïna");
-      if(!s.greixos.length) f.push("un greix saludable");
+      if(q > 0 && (s.g[cat]||0) < q) f.push(textMin(cat));
+    /* «Almenys un d'aquests». Un criteri a zero és un criteri retirat: la
+       Guia no té botó d'esborrar i posar-hi 0 és com es treu. */
+    const alguna = Object.entries(F.alguna||{}).filter(([,q]) => q > 0);
+    if(alguna.length){
+      const teCap = alguna.some(([k,q]) =>
+        (esGrup(k) ? (s.g[k]||0) : (d.i[k]||0)) >= q);
+      if(!teCap) f.push(textAlguna(alguna.map(([k]) => k)));
     }
   }
   return {complet:f.length===0, falten:f, buit:false};
@@ -1763,9 +1791,25 @@ function racions(quan){
    --------------------------------------------------------------------- */
 
 /* Els àpats petits no es mesuren en racions sinó per una recepta fixa. */
+/* Els criteris dels àpats petits. Tot el que hi ha aquí és editable des de
+   la Guia, queda datat i es congela amb el dia validat.
+
+   Fins al 17 d'agost, la proteïna i el greix de l'esmorzar NO eren aquí:
+   estaven escrits dins de checkItems() com un «si no n'hi ha gens, falta».
+   Se'ls havia escapat l'A3 i l'A8 de l'auditoria. Mentre ningú no els podia
+   canviar no feien mal; el dia que es fessin editables, un canvi fet un
+   dimarts hauria recalculat un esmorzar de feia dos mesos. Portant-los aquí
+   se'ls dona la datació i la congelació de franc.
+
+   El canvi va de «que n'hi hagi» a «que n'hi hagi X grams», i això mou una
+   vora: abans el greix demanava UN ingredient de 5 g o més, i ara demana 5 g
+   sumant-los tots. Per als set esmorzars del catàleg no canvia res —el que
+   menys en porta en té 10— però un àpat que ella munti amb 3 g d'oli i 3 g
+   de llavors abans no complia i ara sí. Es va preferir això a mantenir dues
+   maneres de comptar el mateix. */
 const APATS_FIXOS_BASE = {
   esmorzar:{n:"Esmorzar", ajuda:"Pa o flocs de civada, proteïna i un greix",
-            min:{hc:60}, cal:{}},
+            min:{hc:60, prot:1, greix:5}, cal:{}},
   migmati: {n:"Mig matí — batut",
             ajuda:"Base sempre igual; s'hi afegeix fruita i una cullerada de mel",
             min:{fruita:100}, cal:{llet_ame:250, iogurt_soja:120, crema_ame:25, avena:40}},
@@ -2204,6 +2248,7 @@ if (typeof module !== "undefined") module.exports = {
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
   platAltraBanda, veinsDeNit,
   variantSetmana, VARIANTS_SETMANA, DESPLACAMENT_VARIANT,
+  GRUPS_CRITERI, esGrup, NOM_GRUP, nomCriteri, textMin, textAlguna,
   desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,
   RACIONS_BASE, apuntarRacions, racionsVigents, momentDe, MOMENT_ARA,
   apuntarApatsFixos, apatsFixosVigents, retallarHist, MAX_HIST,
