@@ -2932,9 +2932,28 @@ function viewGuia(){
       <button class="btn ghost sm" onclick="exportar()">Exportar còpia (.json)</button>
       <label class="btn ghost sm" style="cursor:pointer">Importar còpia
         <input type="file" accept=".json" style="display:none" onchange="importar(this)"></label>
-      <button class="btn danger sm" onclick="esborrarTot()">Esborrar-ho tot</button>
     </div>
   </div>`;
+
+  /* Esborrar-ho tot no és una opció més de la còpia de seguretat: buida
+     l'aparell i no es pot desfer. Per a qui no és el propietari l'apartat
+     no existeix, no surt apagat: una nutricionista o una psicòloga que hi
+     entrin no han de veure mai aquest botó. */
+  if(potEsborrarTot()){
+    h += `
+  <div class="sec-title"><h2>Esborrar-ho tot</h2></div>
+  <div class="card pad small">
+    <div class="muted">Buida aquest aparell: menús, plats, historial i fotografies.
+      Des d'aquí no es pot desfer; només es recupera important la còpia.</div>
+    <div class="row" style="margin-top:10px;flex-wrap:wrap">
+      <button class="btn ghost sm" onclick="copiaAbansDEsborrar()">1. Descarrega la còpia</button>
+      <button class="btn danger sm" onclick="esborrarTot()"${copiaRecent()?"":" disabled"}>2. Esborra-ho tot</button>
+    </div>
+    <div class="muted" style="margin-top:8px">${copiaRecent()
+      ? "Còpia descarregada: <b>"+esc(copiaAbansEsborrar.nom)+"</b>. El segon botó es torna a tancar al cap de "+MINUTS_COPIA_VALIDA+" minuts."
+      : "El segon botó no s'obre fins que hagis descarregat la còpia."}</div>
+  </div>`;
+  }
   return h;
 }
 async function entrar(){
@@ -2954,6 +2973,41 @@ function descarregarCopia(etiqueta){
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   return a.download;
+}
+/* Qui pot esborrar-ho tot, i amb quines condicions.
+
+   Dues comprovacions, cap de les dues negociable. La primera: qui hi ha
+   al davant ha de ser el propietari del programa. Si no hi ha sessió
+   iniciada no es pot saber qui és, i llavors el botó tampoc surt: val
+   més que en Josep hagi d'entrar que no pas que hi arribi qualsevol des
+   d'un ordinador que s'ha quedat obert.
+
+   La segona: ha d'haver descarregat una còpia fa poc, en aquesta mateixa
+   pantalla. No és un avís que es pugui saltar; el botó està tancat fins
+   que la còpia és al disc. */
+const CORREU_PROPIETARI = "josep.cornelles@gmail.com";
+const MINUTS_COPIA_VALIDA = 10;
+let copiaAbansEsborrar = null;   // {nom, quan} de l'última còpia descarregada aquí
+
+function potEsborrarTot(){
+  const e = (typeof Sync!=="undefined") ? Sync.est : null;
+  if(!e || e.estat !== "connectat" || !e.email) return false;
+  return String(e.email).trim().toLowerCase() === CORREU_PROPIETARI;
+}
+function copiaRecent(){
+  return !!copiaAbansEsborrar &&
+         (Date.now() - copiaAbansEsborrar.quan) < MINUTS_COPIA_VALIDA*60000;
+}
+function copiaAbansDEsborrar(){
+  try{
+    copiaAbansEsborrar = {nom: descarregarCopia("abans-esborrar"), quan: Date.now()};
+  }catch(err){
+    /* Si el navegador ha blocat la descàrrega, el botó d'esborrar es
+       queda tancat: no serviria de res obrir-lo sense la còpia feta. */
+    copiaAbansEsborrar = null;
+    alert("No s'ha pogut descarregar la còpia. El botó d'esborrar continua tancat.");
+  }
+  render();
 }
 function importar(inp){
   const f = inp.files[0]; if(!f) return;
@@ -2988,10 +3042,19 @@ function importar(inp){
   r.readAsText(f);
 }
 async function esborrarTot(){
-  if(!confirm("Segur? S'esborraran tots els menús, plats i historial d'aquest aparell.")) return;
+  /* Es torna a comprovar aquí, i no només en dibuixar el botó, perquè
+     la funció es pot cridar sense passar per la pantalla. */
+  if(!potEsborrarTot())
+    return alert("Això només ho pot fer en Josep, amb la sessió iniciada.");
+  if(!copiaRecent())
+    return alert("Abans d'esborrar has de descarregar la còpia de seguretat, "+
+                 "en aquesta mateixa pantalla.");
+  if(!confirm("Segur? S'esborraran tots els menús, plats i historial d'aquest aparell."+
+              "\n\nCòpia descarregada: "+copiaAbansEsborrar.nom)) return;
   try{
     await Fotos.esborrarTot();
     localStorage.removeItem(KEY);
+    copiaAbansEsborrar = null;
     location.reload();
   }catch(e){
     alert(e && e.message ? e.message : "No s'ha pogut esborrar l'emmagatzematge local.");
