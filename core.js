@@ -1082,6 +1082,47 @@ function veinsDeNit(ds){
   return {dinar: platAltraBanda(ds,"dinar"), sopar: platAltraBanda(ds,"sopar")};
 }
 
+/* ---------------------------------------------------------------------
+   TRES VARIANTS DE SETMANA QUE S'ALTERNEN
+
+   Fins al 17 d'agost, proposarSetmana() donava sempre exactament la
+   mateixa setmana: la llavor de rotació era l'índex del dia dins de la
+   setmana (0–6), que no canvia mai. De 52 setmanes generades en sortia
+   1 de diferent.
+
+   Ara la llavor porta un desplaçament que depèn de la setmana, i com que
+   només pot valer 0, 1 o 2, en surten tres menús setmanals que van
+   rodant. Decisió d'ell: tres, no una seqüència llarga.
+
+   La variant es treu del CALENDARI, no d'un comptador desat enlloc.
+   És deliberat i important: així la setmana del 24 d'agost té la mateixa
+   variant a l'ordinador d'ell, al telèfon d'ella i d'aquí a dos anys.
+   Un comptador s'hauria de sincronitzar, i dos aparells que en tinguessin
+   un de diferent proposarien setmanes diferents.
+
+   El compte es fa en dies UTC a partir d'un dilluns fix. Amb dates locals
+   el canvi d'hora de març i d'octubre fa que una resta de dues mitjanits
+   no doni un múltiple exacte de 24 hores, i la divisió per 7 podria
+   ballar just aquella setmana.
+
+   DESPLACAMENT_VARIANT = 4 no és arbitrari: es van provar tots els valors
+   de 0 a 12 mirant quants àpats coincideixen entre variants, la varietat
+   de dins de cada una i els duplicats de nit. Amb 4, les tres setmanes no
+   comparteixen CAP àpat en el mateix dia i torn (0 de 42), cap no repeteix
+   plat de nit, i entre les tres es fan servir els 16 plats del catàleg.
+   --------------------------------------------------------------------- */
+const VARIANTS_SETMANA = 3;
+const DESPLACAMENT_VARIANT = 4;
+const DILLUNS_REFERENCIA = Date.UTC(2026, 0, 5);   // dilluns 5 de gener de 2026
+
+function variantSetmana(d){
+  const m = monday(d);
+  const dies = Math.round(
+    (Date.UTC(m.getFullYear(), m.getMonth(), m.getDate()) - DILLUNS_REFERENCIA) / 86400000);
+  const n = Math.floor(dies / 7) % VARIANTS_SETMANA;
+  return (n + VARIANTS_SETMANA) % VARIANTS_SETMANA;   // les setmanes d'abans del 2026 també
+}
+
 /* Candidats per a un àpat: els plats que l'admeten, i d'aquests els que
    surten equilibrats si n'hi ha cap. Si no n'hi ha cap d'equilibrat val
    més oferir-los tots que no pas quedar-nos sense candidats. */
@@ -1100,6 +1141,10 @@ function proposarSetmana(mon, opcions){
                    "p_fruita_kiwi","p_fruita_platan"];
   let canvis = 0;
 
+  /* Quina de les tres variants toca aquesta setmana. Surt del calendari:
+     mira el comentari de variantSetmana(). */
+  const variant = variantSetmana(mon);
+
   for(let i=0;i<7;i++){
     const dt = addDays(mon,i);
     if(dt < desde) continue;
@@ -1109,9 +1154,16 @@ function proposarSetmana(mon, opcions){
     /* tampoc toquem un àpat que ella ja hagi adaptat o fet fora */
     const bloquejat = mid => (day.custom && day.custom[mid]) || (day.fora && day.fora[mid]);
 
+    /* Índex de rotació del dia. Fins ara era 'i' a seques i per això
+       totes les setmanes sortien iguals; ara hi va el desplaçament de la
+       variant. Es fa servir a tot arreu on abans hi havia 'i', menys a la
+       paritat dels postres, que ha de continuar alternant iogurt i fruita
+       entre el dinar i el sopar del mateix dia (postresAlternades()). */
+    const r = i + variant*DESPLACAMENT_VARIANT;
+
     for(const mid of ["esmorzar","migmati","berenar"]){
       if(day.meals[mid] || bloquejat(mid)) continue;
-      const p = P[mid]; if(p.length){ day.meals[mid] = p[i % p.length].id; canvis++; }
+      const p = P[mid]; if(p.length){ day.meals[mid] = p[r % p.length].id; canvis++; }
     }
     /* Els plats de l'altra banda de la nit. El del dinar (el sopar d'ahir)
        hi és sempre que el dia d'abans estigui programat, i per això aquest
@@ -1131,7 +1183,7 @@ function proposarSetmana(mon, opcions){
     if(!day.meals.dinar && !bloquejat("dinar")){
       const p = P.dinar.filter(d=>!usats.has(d.id));
       if(p.length){
-        let j = (i*3)%p.length;
+        let j = (r*3)%p.length;
         for(let n=0; n<p.length && p[j].id===vei.dinar; n++) j=(j+1)%p.length;
         if(p[j].id !== vei.dinar){ day.meals.dinar=p[j].id; usats.add(p[j].id); canvis++; }
       }
@@ -1143,7 +1195,7 @@ function proposarSetmana(mon, opcions){
       const pref = p.filter(d=>teCrua(d)===volCrua);
       if(pref.length) p = pref;
       if(p.length){
-        let j = (i*5+2)%p.length;
+        let j = (r*5+2)%p.length;
         for(let n=0; n<p.length && p[j].id===vei.sopar; n++) j=(j+1)%p.length;
         if(p[j].id !== vei.sopar){ day.meals.sopar = p[j].id; canvis++; }
       }
@@ -1152,9 +1204,12 @@ function proposarSetmana(mon, opcions){
        sencer: pot passar que dinar i sopar siguin tots dos de verdura
        cuita i el dia es quedi sense verdura crua, i llavors surt en
        taronja tot i tenir els cinc àpats en verd. */
-    ajustarDia(day, i, P, bloquejat, vei);
-    if(!day.postres.dinar) day.postres.dinar = i%2===0 ? "p_iogurt" : fruites[i%fruites.length];
-    if(!day.postres.sopar) day.postres.sopar = i%2===0 ? fruites[i%fruites.length] : "p_iogurt";
+    ajustarDia(day, r, P, bloquejat, vei);
+    /* La paritat continua amb 'i': el que ha d'alternar és el iogurt i la
+       fruita entre el dinar i el sopar, i això no depèn de la variant.
+       La fruita concreta sí que rota amb la variant. */
+    if(!day.postres.dinar) day.postres.dinar = i%2===0 ? "p_iogurt" : fruites[r%fruites.length];
+    if(!day.postres.sopar) day.postres.sopar = i%2===0 ? fruites[r%fruites.length] : "p_iogurt";
   }
   return canvis;
 }
@@ -2148,6 +2203,7 @@ if (typeof module !== "undefined") module.exports = {
   parseDay, apatDelDia, racions, grupRacio, gramsRacio, racionsDe, faltaApat,
   platsBons, ajustarDia, nutrientsClau, apatsSeguents, reprogramarCadena,
   platAltraBanda, veinsDeNit,
+  variantSetmana, VARIANTS_SETMANA, DESPLACAMENT_VARIANT,
   desferAuto, autosPendents, autosSetmana, LLINDAR_REPETICIO,
   RACIONS_BASE, apuntarRacions, racionsVigents, momentDe, MOMENT_ARA,
   apuntarApatsFixos, apatsFixosVigents, retallarHist, MAX_HIST,
