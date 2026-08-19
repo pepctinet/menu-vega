@@ -193,6 +193,16 @@ const Sync = (() => {
     email: null,
     rol: null,             // admin | usuari | pro
     ultimaSync: null,
+    /* Hi ha coses escrites en aquest aparell que encara no han arribat al
+       servidor. Va a part de 'estat' a proposit: la sessio pot ser
+       perfectament valida i les escriptures fallar igualment, que es el
+       que va passar el 17 i el 18 d'agost. Les pantalles han de mirar
+       aquesta marca i no nomes 'estat', o diran "sincronitzat" mentre
+       s'acumulen dies de pesos sense enviar. */
+    pendent: false,
+    /* El servidor rebutja les escriptures d'aquest compte. No es una
+       caiguda de xarxa: reintentar-ho no ho arreglara mai. */
+    denegat: false,
   };
 
   const configurat = () =>
@@ -256,9 +266,25 @@ const Sync = (() => {
            s'agendava res en connectar-se: els canvis fets sense connexio
            s'hi quedaven fins que en feies un de nou. */
         intentsFallits = 0;
+        est.denegat = false;
         if(Object.keys(S.cuaFotosEsborrades||{}).length ||
            (!NOMES_GUIA && Object.keys(S.cuaDocumentsEsborrats||{}).length))
           pendents.add("__esborrats__");
+        /* La cua nomes viu a la memoria: tancar l'aplicatiu la buida. Si un
+           enviament havia fallat i despres es tanca l'aplicacio, les dades
+           es queden al disc pero ja no hi ha ningu que sapiga que no s'han
+           enviat mai, i no tornaran a sortir fins que es torni a tocar
+           aquell mateix dia. Va passar de debo: amb la sessio iniciada amb
+           un compte 'usuari', les regles rebutjaven privat/** i tres dies
+           de pes i d'acompanyament es van quedar al telefon sense que res
+           ho digues.
+
+           Per aixo, en connectar-se, un aparell d'adult sempre encua un
+           enviament del privat. enviarPrivat() fusiona el que hi ha al
+           servidor abans d'escriure, o sigui que repetir-ho no fa mal:
+           costa una escriptura per sessio i garanteix que res no es queda
+           encallat en silenci. */
+        if(!NOMES_GUIA) pendents.add("__privat__");
         if(pendents.size) programar();
       });
     }catch(e){
@@ -670,10 +696,23 @@ const Sync = (() => {
         }
       }
       intentsFallits = 0;
+      est.pendent = false; est.denegat = false;
       est.ultimaSync = new Date(); est.missatge="Sincronitzat"; onCanvi(est);
     }catch(e){
       console.warn("enviar:", e);
       llista.forEach(k=>pendents.add(k));
+      est.pendent = true;
+
+      /* Un rebuig per permisos no es una caiguda de xarxa. Reintentar-ho
+         cada minut per sempre no ho arreglara: el que cal es canviar de
+         compte. Dir-ho clar, i parar. */
+      if(e && (e.code==="permission-denied" || e.code==="PERMISSION_DENIED")){
+        est.denegat = true;
+        est.missatge = "Aquest compte no pot desar el seguiment";
+        onCanvi(est);
+        return;
+      }
+
       est.missatge="Canvis pendents d'enviar"; onCanvi(est);
       /* Abans es tornava a posar a la cua i s'acabava aqui: no hi havia
          cap nou temporitzador, o sigui que els canvis s'hi quedaven fins

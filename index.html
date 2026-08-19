@@ -44,6 +44,10 @@ header.top{background:var(--verd);color:#fff;padding:14px 0 0}
  box-shadow:0 0 0 2px rgba(255,255,255,.25)}
 .estat-sinc .p.off{background:#ff6b5e}
 .estat-sinc .p.err{background:#ffc043}
+/* Sessió bona però amb coses sense enviar. Mira el comentari de
+   pintarSinc(): «connectat» no vol dir «desat». */
+.estat-sinc .p.pend{background:#ff9500}
+.estat-sinc .p.deneg{background:#ff6b5e}
 
 /* ---------- porta d'entrada ---------- */
 .porta{position:fixed;inset:0;background:var(--sorra);z-index:200;display:flex;
@@ -291,11 +295,11 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<script src="firebase-config.js?v=2026-08-17d"></script>
-<script src="core.js?v=2026-08-17d"></script>
-<script src="nutri.js?v=2026-08-17d"></script>
-<script src="sync.js?v=2026-08-17d"></script>
-<script src="registre-sw.js?v=2026-08-17d"></script>
+<script src="firebase-config.js?v=2026-08-18a"></script>
+<script src="core.js?v=2026-08-18a"></script>
+<script src="nutri.js?v=2026-08-18a"></script>
+<script src="sync.js?v=2026-08-18a"></script>
+<script src="registre-sw.js?v=2026-08-18a"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -3153,11 +3157,20 @@ $("#wprev").onclick  = ()=>{ cursor = addDays(cursor,-7); render(); };
 $("#wnext").onclick  = ()=>{ cursor = addDays(cursor, 7); render(); };
 $("#wtoday").onclick = ()=>{ cursor = monday(avui()); render(); };
 
+/* «Connectat» no vol dir «desat». La sessió pot ser vàlida i les
+   escriptures fallar igualment —el 17 i el 18 d'agost, amb el compte de
+   la Mar, el servidor rebutjava tot el que anava a `privat/**`— i abans
+   això no es veia enlloc si no obries el panell de sincronització. */
 function pintarSinc(e, canvis){
   const p = $("#estatSinc .p");
-  p.className = "p"+(e.estat==="connectat" ? "" : e.estat==="error" ? " err" : " off");
+  p.className = "p"+(
+      e.estat!=="connectat" ? (e.estat==="error" ? " err" : " off")
+    : e.denegat             ? " deneg"
+    : e.pendent             ? " pend"
+    : "");
   $("#estatTxt").textContent =
-    e.estat==="connectat" ? "sessió iniciada"+(e.email?" · "+e.email:"") :
+    e.estat==="connectat" ? ((e.denegat || e.pendent) ? e.missatge : "sessió iniciada")+
+                            (e.email?" · "+e.email:"") :
     e.estat==="sense-sessio" ? "sessió no iniciada" :
     e.estat==="carregant" ? "connectant…" :
     e.estat==="error" ? "sense connexió" : "només aquest aparell";
