@@ -295,11 +295,11 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<script src="firebase-config.js?v=2026-08-18a"></script>
-<script src="core.js?v=2026-08-18a"></script>
-<script src="nutri.js?v=2026-08-18a"></script>
-<script src="sync.js?v=2026-08-18a"></script>
-<script src="registre-sw.js?v=2026-08-18a"></script>
+<script src="firebase-config.js?v=2026-08-20a"></script>
+<script src="core.js?v=2026-08-20a"></script>
+<script src="nutri.js?v=2026-08-20a"></script>
+<script src="sync.js?v=2026-08-20a"></script>
+<script src="registre-sw.js?v=2026-08-20a"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -3002,12 +3002,18 @@ function viewGuia(){
   <div class="sec-title"><h2>Esborrar-ho tot</h2></div>
   <div class="card pad small">
     <div class="muted">Buida aquest aparell: menús, plats, historial i fotografies.
-      Des d'aquí no es pot desfer; només es recupera important la còpia.</div>
+      Des d'aquí no es pot desfer; només es recupera important la còpia.
+      El fitxer de la còpia porta els menús, la guia i l'historial, però <b>no</b> les
+      fotografies ni els documents adjunts: aquests es tornen a baixar del servidor,
+      on ja hi són.</div>
     <div class="row" style="margin-top:10px;flex-wrap:wrap">
       <button class="btn ghost sm" onclick="copiaAbansDEsborrar()">1. Descarrega la còpia</button>
-      <button class="btn danger sm" onclick="esborrarTot()"${copiaRecent()?"":" disabled"}>2. Esborra-ho tot</button>
+      <button class="btn danger sm" onclick="esborrarTot()"${(copiaRecent() && !Sync.est.pendent)?"":" disabled"}>2. Esborra-ho tot</button>
     </div>
-    <div class="muted" style="margin-top:8px">${copiaRecent()
+    <div class="muted" style="margin-top:8px">${
+      Sync.est.pendent
+      ? "Hi ha <b>"+Sync.quantsPendents()+"</b> canvis d'aquest aparell que encara no han arribat al servidor. El botó d'esborrar no s'obre fins que hagin sortit."
+      : copiaRecent()
       ? "Còpia descarregada: <b>"+esc(copiaAbansEsborrar.nom)+"</b>. El segon botó es torna a tancar al cap de "+MINUTS_COPIA_VALIDA+" minuts."
       : "El segon botó no s'obre fins que hagis descarregat la còpia."}</div>
   </div>`;
@@ -3107,11 +3113,27 @@ async function esborrarTot(){
   if(!copiaRecent())
     return alert("Abans d'esborrar has de descarregar la còpia de seguretat, "+
                  "en aquesta mateixa pantalla.");
+  /* Amb canvis sense enviar, esborrar és perdre'ls: al servidor no hi
+     són i aquí deixaran de ser-hi. Són al fitxer de la còpia, però
+     recuperar-los demanaria importar-la, i qui esborra normalment vol
+     començar de nou. Val més esperar que surtin. */
+  if(Sync.est.pendent)
+    return alert("Hi ha canvis d'aquest aparell que encara no han arribat al "+
+                 "servidor: "+Sync.quantsPendents()+" per enviar.\n\n"+
+                 (Sync.est.denegat
+                   ? "El servidor els rebutja amb aquest compte. Entra amb el compte "+
+                     "que pot desar el seguiment i torna-ho a provar."
+                   : "Espera't que la marca digui «sessió iniciada» i torna-ho a provar."));
   if(!confirm("Segur? S'esborraran tots els menús, plats i historial d'aquest aparell."+
-              "\n\nCòpia descarregada: "+copiaAbansEsborrar.nom)) return;
+              "\n\nCòpia descarregada: "+copiaAbansEsborrar.nom+
+              "\n\nLes fotografies i els documents adjunts no són dins del fitxer de "+
+              "la còpia: es tornaran a baixar del servidor.")) return;
   try{
     await Fotos.esborrarTot();
     localStorage.removeItem(KEY);
+    /* La cua de canvis pendents viu en una clau a part i s'ha d'endur
+       igualment: si no, queda apuntant a dies que ja no existeixen. */
+    Sync.oblidarCua();
     copiaAbansEsborrar = null;
     location.reload();
   }catch(e){

@@ -52,6 +52,9 @@ header .data{font-size:13px;opacity:.88;margin-top:2px;text-transform:capitalize
 .sinc .p{width:6px;height:6px;border-radius:99px;background:#a8d18c}
 .sinc .p.off{background:rgba(255,255,255,.45)}
 .sinc .p.err{background:#f0c05a}
+/* Els canvis que encara no han sortit del telèfon. Mateix to que l'avís
+   de connexió: és una qüestió de xarxa, no una valoració de res. */
+.sinc .p.pend{background:#f0c05a}
 .hmenu{background:rgba(255,255,255,.16);border-radius:99px;width:38px;height:38px;
  color:#fff;font-size:18px;flex:none;display:flex;align-items:center;justify-content:center}
 
@@ -242,10 +245,10 @@ textarea.camp{width:100%;padding:12px 14px;border:1px solid var(--linia);border-
    missatges i els documents encara que no els ensenyés enlloc. */
 window.MENU_VEGA_NOMES_GUIA = true;
 </script>
-<script src="firebase-config.js?v=2026-08-18a"></script>
-<script src="core.js?v=2026-08-18a"></script>
-<script src="sync.js?v=2026-08-18a"></script>
-<script src="registre-sw.js?v=2026-08-18a"></script>
+<script src="firebase-config.js?v=2026-08-20a"></script>
+<script src="core.js?v=2026-08-20a"></script>
+<script src="sync.js?v=2026-08-20a"></script>
+<script src="registre-sw.js?v=2026-08-20a"></script>
 <script>
 /* =====================================================================
    APLICATIU DE MÒBIL · només el dia en curs
@@ -873,8 +876,11 @@ document.getElementById("btnMes").onclick = () => {
       <button class="btn" onclick="entrar()">Entrar</button>
       <div id="lgErr" style="color:#c0392b;font-size:13px;margin-top:8px"></div>`;
   } else if(e.estat==="connectat"){
-    h += `<div style="font-size:13.5px">Connectat com a <b>${esc(e.email)}</b></div>
-      <button class="btn g" style="margin-top:11px" onclick="Sync.logout();tancarFull()">Tancar la sessió</button>`;
+    h += `<div style="font-size:13.5px">Connectat com a <b>${esc(e.email)}</b></div>`;
+    /* Mateix text que a la capçalera, i pel mateix motiu. */
+    if(e.pendent || e.denegat)
+      h += `<div style="font-size:13px;color:var(--gris);margin-top:6px">${TEXT_SENSE_ENVIAR}.</div>`;
+    h += `<button class="btn g" style="margin-top:11px" onclick="Sync.logout();tancarFull()">Tancar la sessió</button>`;
   } else {
     h += `<div style="font-size:13.5px;color:var(--gris)">${esc(e.missatge)}</div>`;
   }
@@ -899,11 +905,21 @@ async function entrar(){
 /* =====================================================================
    ESTAT I ARRENCADA
    ===================================================================== */
+/* La sessió pot ser bona i les escriptures fallar igualment. Fins ara
+   això aquí no es veia: deia "Connectat" mentre el que ella havia anotat
+   es quedava al telèfon.
+
+   El text és sempre el mateix, passi el que passi i faci els dies que
+   faci: cap recompte, cap data, cap històric. No li ha de dir res sobre
+   com ho ha fet, només que la nota encara no ha sortit d'aquí. */
+const TEXT_SENSE_ENVIAR = "Encara no s'ha desat fora del telèfon";
 function pintarSinc(e, hiHaCanvis){
   const p = document.querySelector("#sinc .p");
-  p.className = "p" + (e.estat==="connectat" ? "" : e.estat==="error" ? " err" : " off");
+  const senseEnviar = e.pendent || e.denegat;
+  p.className = "p" + (e.estat==="connectat" ? (senseEnviar ? " pend" : "")
+                     : e.estat==="error" ? " err" : " off");
   document.getElementById("sincTxt").textContent =
-    e.estat==="connectat" ? "Connectat" :
+    e.estat==="connectat" ? (senseEnviar ? TEXT_SENSE_ENVIAR : "Connectat") :
     e.estat==="sense-sessio" ? "Sessió no iniciada" :
     e.estat==="carregant" ? "Connectant…" : e.missatge;
   if(hiHaCanvis){ netejarNutri(); pintar(); }

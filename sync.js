@@ -187,6 +187,52 @@ const Sync = (() => {
   let pendents = new Set();
   let temporitzador = null;
 
+  /* --- la cua sobreviu a tancar l'aplicatiu ---
+     Fins ara 'pendents' només vivia a la memòria. Si una escriptura
+     fallava i tot seguit es tancava l'aplicatiu, les dades es quedaven al
+     disc però ja no hi havia ningú que sabés que no s'havien enviat: no
+     tornaven a sortir fins que es tornava a tocar aquell mateix dia.
+     Ara les claus brutes es desen i es recuperen en obrir.
+
+     Va en una clau a part de l'estat, i no dins de S, a propòsit:
+     nomesGuia() (core.js) esborra del mòbil qualsevol clau que no sigui
+     de la guia abans de desar. Desant-la dins de S desapareixeria
+     justament a l'aparell on més falta fa, i en silenci. A part, així no
+     s'ha de tocar ni CAMPS_COPIA ni la validació d'importació.
+
+     La clau es demana en el moment d'usar-la i no en definir el mòdul:
+     KEY viu a core.js, i calculant-la aquí dalt sync.js deixava de
+     poder-se carregar des de les proves (i de qualsevol pàgina que
+     carregués els scripts en un altre ordre). Va petar de seguida, que
+     és l'única manera bona de petar. */
+  function clauCua(){
+    return (typeof KEY !== "undefined" ? KEY : "menuvega") + "_cua";
+  }
+  function llegirCua(){
+    try{
+      const v = JSON.parse(localStorage.getItem(clauCua()) || "[]");
+      return Array.isArray(v) ? v.filter(k => typeof k === "string") : [];
+    }catch(e){ return []; }
+  }
+  function desarCua(){
+    try{
+      if(pendents.size) localStorage.setItem(clauCua(), JSON.stringify([...pendents]));
+      else localStorage.removeItem(clauCua());
+    }catch(e){}
+  }
+  /* Una sola porta d'entrada a la cua: així no hi ha cap camí que hi
+     posi res sense desar-ho al disc i sense encendre la marca. */
+  function encuar(k){
+    pendents.add(k);
+    est.pendent = true;
+    desarCua();
+  }
+  function oblidarCua(){
+    pendents.clear();
+    est.pendent = false;
+    try{ localStorage.removeItem(clauCua()); }catch(e){}
+  }
+
   const est = {
     estat: "off",          // off | carregant | sense-sessio | connectat | error
     missatge: "Només en aquest aparell",
@@ -220,6 +266,12 @@ const Sync = (() => {
 
   async function init(cb){
     onCanvi = cb || onCanvi;
+    /* La cua del disc es recupera abans de res. Encara que no hi hagi
+       sessió ni connexió, la marca ha de ser certa des del primer
+       instant: si no, la pantalla diu que tot està desat mentre al disc
+       hi ha canvis que no han sortit d'aquest aparell. */
+    for(const k of llegirCua()) pendents.add(k);
+    est.pendent = pendents.size > 0;
     if(!configurat()){
       est.estat="off";
       est.missatge="Només en aquest aparell";
@@ -267,6 +319,13 @@ const Sync = (() => {
            s'hi quedaven fins que en feies un de nou. */
         intentsFallits = 0;
         est.denegat = false;
+        /* Tot el que hagi quedat al disc d'una sessió anterior torna a la
+           cua: dies, criteris, privat i esborrats, cadascun amb la seva
+           clau. No es reenvia tot indiscriminadament -això podria posar
+           una versió vella per sobre d'una de més nova d'un altre
+           aparell-, només el que aquest aparell va tocar i no va poder
+           enviar. */
+        for(const k of llegirCua()) pendents.add(k);
         if(Object.keys(S.cuaFotosEsborrades||{}).length ||
            (!NOMES_GUIA && Object.keys(S.cuaDocumentsEsborrats||{}).length))
           pendents.add("__esborrats__");
@@ -285,6 +344,8 @@ const Sync = (() => {
            costa una escriptura per sessio i garanteix que res no es queda
            encallat en silenci. */
         if(!NOMES_GUIA) pendents.add("__privat__");
+        est.pendent = pendents.size > 0;
+        desarCua();
         if(pendents.size) programar();
       });
     }catch(e){
@@ -497,8 +558,8 @@ const Sync = (() => {
       if(dr.supervisio){
         if(!NOMES_GUIA){
           fusionarSupervisio({[ds]:{valors:dr.supervisio,u:dr.u||0}});
-          pendents.add("__privat__");
-          pendents.add("dia:"+ds);
+          encuar("__privat__");
+          encuar("dia:"+ds);
           programar();
         }
         delete dr.supervisio;
@@ -575,25 +636,25 @@ const Sync = (() => {
      dades perdudes sense cap avis i sense cap conflicte visible.
      Enviant nomes {dies: {<data>: ...}} amb merge, Firestore fusiona
      aquella clau i deixa les germanes com estaven. */
-  function marcar(k){ pendents.add(k); programar(); }
+  function marcar(k){ encuar(k); programar(); }
   function push(){
     for(const setmana of Object.values(S.weeks||{}))
-      for(const ds of Object.keys(setmana)) pendents.add("dia:"+ds);
-    pendents.add("__config__");
+      for(const ds of Object.keys(setmana)) encuar("dia:"+ds);
+    encuar("__config__");
     programar();
   }
-  function pushDia(ds){ pendents.add("dia:"+ds); programar(); }
+  function pushDia(ds){ encuar("dia:"+ds); programar(); }
   function pushPrivat(){
     if(NOMES_GUIA) return;
-    pendents.add("__privat__"); programar();
+    encuar("__privat__"); programar();
   }
   /* Es conserva pel codi antic que encara crida amb la clau de setmana */
   function pushSetmana(k){
     const setmana = S.weeks[k];
-    if(setmana) for(const ds of Object.keys(setmana)) pendents.add("dia:"+ds);
+    if(setmana) for(const ds of Object.keys(setmana)) encuar("dia:"+ds);
     programar();
   }
-  function pushConfig(){ pendents.add("__config__"); programar(); }
+  function pushConfig(){ encuar("__config__"); programar(); }
 
   /* Quina revisio toca escriure. Es llegeix la que hi ha al servidor i
      es puja una per sobre de la mes alta de les dues. Si no es pot
@@ -635,13 +696,22 @@ const Sync = (() => {
     });
   }
 
+  /* La pantalla s'assabenta d'entrada que hi ha coses per enviar, no
+     només quan l'enviament ha fallat. Abans, durant els 900 mil·lisegons
+     d'espera -i sempre que no hi havia sessió, perquè aleshores no
+     s'arribava ni a programar res- la marca continuava dient que tot
+     estava desat. */
   function programar(){
+    onCanvi(est);
     if(est.estat!=="connectat") return;
     clearTimeout(temporitzador);
     temporitzador = setTimeout(enviar, 900);
   }
   async function enviar(){
     if(est.estat!=="connectat" || !pendents.size) return;
+    /* La còpia del disc NO es toca aquí: les claus s'hi queden fins que
+       el servidor confirma. Si l'aplicatiu es tanca a mig enviament, en
+       obrir-la tornen a sortir. */
     const llista = [...pendents]; pendents.clear();
     try{
       for(const k of llista){
@@ -681,27 +751,49 @@ const Sync = (() => {
           const day = setmana && setmana[ds];
           if(!day) continue;
           const ref = dbf.doc("plans/"+PLA_ID+"/setmanes/"+weekKey(parseDay(ds)));
-          const ara = firebase.firestore.FieldValue.serverTimestamp();
-          try{
-            /* Reemplaça el mapa del dia sencer. Amb set({merge:true}),
-               supervisio podia sobreviure al servidor tot i no ser ja a
-               l'objecte local, perque Firestore fusiona els mapes. */
-            await ref.update(new firebase.firestore.FieldPath("dies",ds), day,
-                             "actualitzat", ara);
-          }catch(e){
-            if(e && (e.code==="not-found" || e.code==="not_found"))
-              await ref.set({dies:{[ds]:day},actualitzat:ara},{merge:true});
-            else throw e;
-          }
+          /* Es llegeix el dia del servidor dins de la mateixa transacció
+             i només s'escriu si el que tenim aquí és igual o més nou.
+
+             Cal des que la cua es recupera del disc: un dia encuat ahir
+             es podia enviar en connectar-se abans que arribés el primer
+             onSnapshot, i llavors una versió vella d'aquest aparell
+             tapava la bona d'un altre. Amb la comparació, la nostra
+             passa al davant o no passa; mai no fa marxa enrere.
+
+             S'escriu el mapa del dia sencer, no fusionat: amb
+             set({merge:true}), supervisio sobrevivia al servidor tot i
+             no ser ja a l'objecte local, perquè Firestore fusiona els
+             mapes. */
+          await dbf.runTransaction(async tx=>{
+            const d = await tx.get(ref);
+            const ara = firebase.firestore.FieldValue.serverTimestamp();
+            if(!d.exists){
+              tx.set(ref,{dies:{[ds]:day},actualitzat:ara},{merge:true});
+              return;
+            }
+            const remot = (d.data().dies||{})[ds];
+            if(remot && (remot.u||0) > (day.u||0)) return;
+            tx.update(ref, new firebase.firestore.FieldPath("dies",ds), day,
+                           "actualitzat", ara);
+          });
         }
       }
       intentsFallits = 0;
-      est.pendent = false; est.denegat = false;
-      est.ultimaSync = new Date(); est.missatge="Sincronitzat"; onCanvi(est);
+      est.denegat = false;
+      /* Les claus enviades es retiren del disc ara, no abans. El que
+         hagi entrat a la cua mentre durava l'enviament hi continua: si
+         no, es dirà "Sincronitzat" amb coses per sortir. */
+      desarCua();
+      est.pendent = pendents.size > 0;
+      est.ultimaSync = new Date();
+      est.missatge = est.pendent ? "Canvis pendents d'enviar" : "Sincronitzat";
+      onCanvi(est);
+      if(est.pendent) programar();
     }catch(e){
       console.warn("enviar:", e);
       llista.forEach(k=>pendents.add(k));
       est.pendent = true;
+      desarCua();
 
       /* Un rebuig per permisos no es una caiguda de xarxa. Reintentar-ho
          cada minut per sempre no ho arreglara: el que cal es canviar de
@@ -798,7 +890,7 @@ const Sync = (() => {
     S.cuaFotosEsborrades[ds+"_"+meal] = {ds,meal};
     desarLocal();
     await Fotos.esborrar(ds, meal);
-    pendents.add("__esborrats__");
+    encuar("__esborrats__");
     programar();
   }
 
@@ -848,7 +940,7 @@ const Sync = (() => {
     S.cuaDocumentsEsborrats[fitxa.id] = {parts:Number(fitxa.parts)||0};
     desarLocal();
     await Fotos.esborrarBlob("doc_"+fitxa.id);
-    pendents.add("__esborrats__");
+    encuar("__esborrats__");
     programar();
   }
 
@@ -886,7 +978,12 @@ const Sync = (() => {
 
   return {est, init, login, logout, push, pushDia, pushPrivat, pushSetmana, pushConfig, marcar,
           pujarFoto, baixarFoto, esborrarFoto, espaiFotos, espaiDocs, espaiTotal, configurat,
-          pujarDocument, baixarDocument, esborrarDocument};
+          pujarDocument, baixarDocument, esborrarDocument,
+          /* La cua desada: 'quantsPendents' per poder-ho preguntar abans
+             d'esborrar-ho tot, i 'oblidarCua' perquè esborrar-ho tot
+             també se l'endugui. Sense això quedava una cua òrfena
+             apuntant a dies que ja no existeixen. */
+          quantsPendents: () => pendents.size, oblidarCua, clauCua};
 })();
 
 
