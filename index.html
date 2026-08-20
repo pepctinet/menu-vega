@@ -295,11 +295,11 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<script src="firebase-config.js?v=2026-08-20a"></script>
-<script src="core.js?v=2026-08-20a"></script>
-<script src="nutri.js?v=2026-08-20a"></script>
-<script src="sync.js?v=2026-08-20a"></script>
-<script src="registre-sw.js?v=2026-08-20a"></script>
+<script src="firebase-config.js?v=2026-08-20b"></script>
+<script src="core.js?v=2026-08-20b"></script>
+<script src="nutri.js?v=2026-08-20b"></script>
+<script src="sync.js?v=2026-08-20b"></script>
+<script src="registre-sw.js?v=2026-08-20b"></script>
 <script>
 /* =====================================================================
    APLICATIU D'ORDINADOR
@@ -3048,15 +3048,29 @@ function descarregarCopia(etiqueta){
 
    La segona: ha d'haver descarregat una còpia fa poc, en aquesta mateixa
    pantalla. No és un avís que es pugui saltar; el botó està tancat fins
-   que la còpia és al disc. */
-const CORREU_PROPIETARI = "josep.cornelles@gmail.com";
+   que la còpia és al disc.
+
+   QUI ÉS EL PROPIETARI. Fins al 20 d'agost aquí hi havia el correu
+   personal escrit a pèl. Funcionava, però aquest fitxer es publica a un
+   repositori públic i es serveix per GitHub Pages: era una adreça
+   personal publicada per sempre, també a l'històric de Git.
+
+   Ara es demana el rol, que ja arriba de 'plans/<pla>/membres/<uid>' i
+   que Sync llegeix en iniciar la sessió. El criteri viu al servidor, on
+   no es publica, i qui el pot canviar és qui ja mana de debò: les
+   regles de Firestore. El codi públic ja no diu qui és ningú.
+
+   Comprovat el 20 d'agost a la consola: el document d'en Josep porta
+   rol "admin" i el de la Mar rol "usuari", tant a 'proves' com a
+   'principal'. Si algun dia el rol no es pot llegir, llegirRol() torna
+   "usuari" i el botó no surt: falla cap al costat segur. */
 const MINUTS_COPIA_VALIDA = 10;
 let copiaAbansEsborrar = null;   // {nom, quan} de l'última còpia descarregada aquí
 
 function potEsborrarTot(){
   const e = (typeof Sync!=="undefined") ? Sync.est : null;
-  if(!e || e.estat !== "connectat" || !e.email) return false;
-  return String(e.email).trim().toLowerCase() === CORREU_PROPIETARI;
+  if(!e || e.estat !== "connectat") return false;
+  return e.rol === "admin";
 }
 function copiaRecent(){
   return !!copiaAbansEsborrar &&
